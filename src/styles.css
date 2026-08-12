@@ -226,6 +226,24 @@ h2 {
   line-height: 1;
   filter: drop-shadow(0 0 10px rgb(127 216 166 / 45%));
 }
+/* Idle-state affordance: before the first trial, a soft breathing glow
+   behind the fixation cross hints that the field is waiting on input,
+   rather than reading as an inert blank grid. Reuses the same translucent
+   brass tone already used for the page background glow. */
+.field.field--idle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9rem;
+  height: 9rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(198 138 62 / 14%), transparent 70%);
+  animation: idle-glow 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .field-message {
   position: absolute;
   bottom: 0.85rem;
@@ -394,6 +412,11 @@ footer { padding-top: 1.5rem; color: var(--paper-faint); font-size: 0.82rem; tex
 @keyframes fixation-pulse {
   0%, 100% { opacity: 0.75; text-shadow: 0 0 0 rgb(226 167 90 / 0%); }
   50% { opacity: 1; text-shadow: 0 0 8px rgb(226 167 90 / 45%); }
+}
+
+@keyframes idle-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* ---------------------------------------------------------------------- */

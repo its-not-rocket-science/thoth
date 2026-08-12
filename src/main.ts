@@ -249,6 +249,7 @@ function setPhase(next: Phase): void {
   gameLayout.hidden = complete;
   feedback.hidden = complete;
   summaryPanel.hidden = !complete;
+  field.classList.toggle("field--idle", phase === "ready" && state.attempts === 0);
 
   if (complete) {
     start.textContent = "Start new session";
