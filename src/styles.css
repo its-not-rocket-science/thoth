@@ -350,6 +350,13 @@ legend {
 .dial-point:has(input:checked) span { color: var(--brass-bright); }
 .dial-point:has(input:focus-visible) { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
 
+/* Shown on a miss to point at the position the player should have picked;
+   phosphor ring keeps it visually distinct from the brass "checked" ring
+   above, since both can be lit at once when the shape answer was wrong
+   but the position answer happened to be right. */
+.dial-point.correct-answer { border-color: var(--phosphor); box-shadow: 0 0 0 1px var(--phosphor), 0 0 10px rgb(127 216 166 / 45%); }
+.dial-point.correct-answer span { color: var(--phosphor); }
+
 .submit-answer { width: 100%; margin-top: 1.1rem; }
 
 /* ---------------------------------------------------------------------- */

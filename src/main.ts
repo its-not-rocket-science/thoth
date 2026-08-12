@@ -249,6 +249,17 @@ function hideStimuli(): void {
   peripheral.hidden = true;
 }
 
+function clearDialFeedback(): void {
+  document.querySelectorAll(".dial-point.correct-answer").forEach(el => el.classList.remove("correct-answer"));
+}
+
+function markCorrectPosition(position: PeripheralPosition): void {
+  const point = document
+    .querySelector<HTMLInputElement>(`.dial-point input[value="${position}"]`)
+    ?.closest<HTMLElement>(".dial-point");
+  point?.classList.add("correct-answer");
+}
+
 function showTrial(activeTrial: Trial): void {
   central.className = `central ${activeTrial.centralSymbol}`;
   positionPeripheral(activeTrial.peripheralPosition);
@@ -259,6 +270,7 @@ function showTrial(activeTrial: Trial): void {
 function presentTrial(activeTrial: Trial): void {
   clearTimers();
   hideStimuli();
+  clearDialFeedback();
   setPhase("preparing");
 
   schedule(() => {
@@ -355,6 +367,7 @@ response.addEventListener("submit", event => {
   } else {
     feedback.textContent = `Not quite. It was a ${trial.centralSymbol}, at position ${trial.peripheralPosition + 1}.`;
     feedback.dataset.result = "incorrect";
+    markCorrectPosition(trial.peripheralPosition);
   }
 
   trial = null;
@@ -371,6 +384,7 @@ reset.addEventListener("click", () => {
   bestPresentationMs = null;
   trial = null;
   hideStimuli();
+  clearDialFeedback();
   response.reset();
   feedback.textContent = "Progress reset.";
   delete feedback.dataset.result;
