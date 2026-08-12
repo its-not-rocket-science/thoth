@@ -1,5 +1,5 @@
 import "./styles.css";
-import { createTrial, INITIAL_STATE, scoreTrial } from "./game";
+import { createTrial, INITIAL_STATE, scoreTrial, summarizeSession } from "./game";
 import type { CentralSymbol, PeripheralPosition, SessionState, Trial } from "./types";
 
 const STORAGE_KEY = "thoth-progress-v1";
@@ -75,7 +75,7 @@ app.innerHTML = `
         <div class="readout"><dt>Best</dt><dd id="best">—</dd></div>
       </dl>
 
-      <div class="game-layout">
+      <div id="game-layout" class="game-layout">
         <div class="field-column">
           <div id="field" class="field" aria-label="Visual stimulus field">
             <div class="fixation" aria-hidden="true">+</div>
@@ -114,6 +114,16 @@ app.innerHTML = `
       </div>
 
       <p id="feedback" class="feedback" aria-live="assertive"></p>
+
+      <section id="summary" class="summary-panel" hidden aria-labelledby="summary-heading">
+        <p class="eyebrow" id="summary-heading">Session complete</p>
+        <dl class="readouts">
+          <div class="readout"><dt>Score</dt><dd id="summary-score">0 / ${SESSION_LENGTH}</dd></div>
+          <div class="readout"><dt>Accuracy</dt><dd id="summary-accuracy">—</dd></div>
+          <div class="readout"><dt>Lowest interval</dt><dd id="summary-lowest">—</dd></div>
+          <div class="readout"><dt>Correct / incorrect</dt><dd id="summary-counts">0 / 0</dd></div>
+        </dl>
+      </section>
     </section>
 
     <footer>Progress is saved in this browser using web storage. No analytics or account required.</footer>
@@ -126,6 +136,12 @@ function find<T extends Element>(selector: string): T {
   return element;
 }
 
+const gameLayout = find<HTMLDivElement>("#game-layout");
+const summaryPanel = find<HTMLElement>("#summary");
+const summaryScore = find<HTMLElement>("#summary-score");
+const summaryAccuracy = find<HTMLElement>("#summary-accuracy");
+const summaryLowest = find<HTMLElement>("#summary-lowest");
+const summaryCounts = find<HTMLElement>("#summary-counts");
 const field = find<HTMLDivElement>("#field");
 const central = find<HTMLDivElement>("#central");
 const peripheral = find<HTMLDivElement>("#peripheral");
@@ -147,6 +163,7 @@ const progressFill = find<HTMLDivElement>("#progress-fill");
 
 let state: SessionState = { ...INITIAL_STATE };
 let bestPresentationMs: number | null = null;
+let sessionLowestMs: number = INITIAL_STATE.presentationMs;
 let trial: Trial | null = null;
 let phase: Phase = "ready";
 let timers: number[] = [];
@@ -170,6 +187,9 @@ function loadProgress(): void {
         streak: Math.max(0, saved.state.streak),
         presentationMs: Math.max(120, Math.min(1500, saved.state.presentationMs)),
       };
+      // The true in-session low can predate a reload and isn't persisted;
+      // the resumed presentationMs is the best available floor for it.
+      sessionLowestMs = state.presentationMs;
     }
     if (typeof saved.bestPresentationMs === "number" && Number.isFinite(saved.bestPresentationMs)) {
       bestPresentationMs = saved.bestPresentationMs;
@@ -207,6 +227,14 @@ function updateStats(): void {
   progressTrack.setAttribute("aria-valuenow", String(completed));
 }
 
+function renderSummary(): void {
+  const summary = summarizeSession(state, sessionLowestMs);
+  summaryScore.textContent = `${summary.score} / ${SESSION_LENGTH}`;
+  summaryAccuracy.textContent = `${summary.accuracyPct}%`;
+  summaryLowest.textContent = `${summary.lowestPresentationMs} ms`;
+  summaryCounts.textContent = `${summary.correct} / ${summary.incorrect}`;
+}
+
 function setPhase(next: Phase): void {
   phase = next;
   const paused = phase === "paused";
@@ -218,10 +246,14 @@ function setPhase(next: Phase): void {
   pause.disabled = complete;
   replay.disabled = !(phase === "responding" && trial !== null);
   start.disabled = !["ready", "complete"].includes(phase);
+  gameLayout.hidden = complete;
+  feedback.hidden = complete;
+  summaryPanel.hidden = !complete;
 
   if (complete) {
     start.textContent = "Start new session";
     fieldMessage.textContent = "Session complete";
+    renderSummary();
   } else if (phase === "ready") {
     start.textContent = state.attempts === 0 ? "Start trial" : "Next trial";
     fieldMessage.textContent = "Ready";
@@ -291,6 +323,7 @@ function presentTrial(activeTrial: Trial): void {
 function beginTrial(): void {
   if (phase === "complete") {
     state = { ...INITIAL_STATE };
+    sessionLowestMs = INITIAL_STATE.presentationMs;
     trial = null;
     feedback.textContent = "";
     saveProgress();
@@ -357,6 +390,7 @@ response.addEventListener("submit", event => {
     centralSymbol: centralAnswer,
     peripheralPosition: positionAnswer,
   });
+  sessionLowestMs = Math.min(sessionLowestMs, state.presentationMs);
 
   if (correct) {
     feedback.textContent = "Correct.";
@@ -382,6 +416,7 @@ reset.addEventListener("click", () => {
   localStorage.removeItem(STORAGE_KEY);
   state = { ...INITIAL_STATE };
   bestPresentationMs = null;
+  sessionLowestMs = INITIAL_STATE.presentationMs;
   trial = null;
   hideStimuli();
   clearDialFeedback();

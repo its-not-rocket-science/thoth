@@ -2,6 +2,7 @@ import type {
   CentralSymbol,
   PeripheralPosition,
   SessionState,
+  SessionSummary,
   Trial,
   TrialResponse,
 } from "./types";
@@ -53,5 +54,19 @@ export function scoreTrial(
     attempts: state.attempts + 1,
     streak,
     presentationMs,
+  };
+}
+
+/** lowestPresentationMs is tracked by the caller across a session, since
+ *  SessionState only carries the current interval and the staircase can
+ *  move it back up after a miss. */
+export function summarizeSession(state: SessionState, lowestPresentationMs: number): SessionSummary {
+  return {
+    score: state.score,
+    attempts: state.attempts,
+    accuracyPct: state.attempts === 0 ? 0 : Math.round((state.score / state.attempts) * 100),
+    correct: state.score,
+    incorrect: state.attempts - state.score,
+    lowestPresentationMs,
   };
 }

@@ -374,6 +374,18 @@ legend {
 .feedback[data-result="correct"] { color: var(--phosphor); }
 .feedback[data-result="incorrect"] { color: var(--alert); }
 
+/* ---------------------------------------------------------------------- */
+/* Session-complete summary                                               */
+/* ---------------------------------------------------------------------- */
+.summary-panel {
+  padding: clamp(1rem, 2.6vw, 1.5rem);
+  border: 1px solid var(--hairline);
+  border-radius: 0.6rem;
+  background: var(--panel-sunken);
+}
+.summary-panel .eyebrow { margin-bottom: 0.85rem; }
+.summary-panel .readouts { margin-bottom: 0; }
+
 footer { padding-top: 1.5rem; color: var(--paper-faint); font-size: 0.82rem; text-align: center; }
 
 /* ---------------------------------------------------------------------- */

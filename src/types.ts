@@ -18,3 +18,12 @@ export interface SessionState {
   streak: number;
   presentationMs: number;
 }
+
+export interface SessionSummary {
+  score: number;
+  attempts: number;
+  accuracyPct: number;
+  correct: number;
+  incorrect: number;
+  lowestPresentationMs: number;
+}
