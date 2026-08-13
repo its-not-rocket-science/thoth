@@ -15,6 +15,7 @@ export const INITIAL_STATE: SessionState = {
   attempts: 0,
   streak: 0,
   presentationMs: 850,
+  distractorCount: 2,
 };
 
 function randomItem<T>(items: readonly T[]): T {
@@ -23,11 +24,30 @@ function randomItem<T>(items: readonly T[]): T {
   return item;
 }
 
-export function createTrial(presentationMs: number): Trial {
+function shuffled<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j] as T, result[i] as T];
+  }
+  return result;
+}
+
+/** Picks up to `count` peripheral positions other than `target`, with no
+ *  duplicates and no overlap with the target itself. */
+export function generateDistractors(target: PeripheralPosition, count: number): PeripheralPosition[] {
+  const pool = POSITIONS.filter(position => position !== target);
+  const size = Math.max(0, Math.min(count, pool.length));
+  return shuffled(pool).slice(0, size);
+}
+
+export function createTrial(presentationMs: number, distractorCount = 0): Trial {
+  const peripheralPosition = randomItem(POSITIONS);
   return {
     centralSymbol: randomItem(SYMBOLS),
-    peripheralPosition: randomItem(POSITIONS),
+    peripheralPosition,
     presentationMs,
+    distractorPositions: generateDistractors(peripheralPosition, distractorCount),
   };
 }
 
@@ -54,6 +74,7 @@ export function scoreTrial(
     attempts: state.attempts + 1,
     streak,
     presentationMs,
+    distractorCount: state.distractorCount,
   };
 }
 

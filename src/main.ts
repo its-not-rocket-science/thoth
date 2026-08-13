@@ -65,7 +65,8 @@ app.innerHTML = `
 
       <p class="instructions">
         Keep your eyes on the centre. A <strong>circle or diamond</strong> will appear there
-        while an ibis appears at one of eight positions around it. After they vanish, choose both answers.
+        while an ibis appears at one of eight positions around it, sometimes alongside a few
+        dimmer decoy glyphs elsewhere. After they vanish, choose the shape and the ibis's position.
       </p>
 
       <dl class="readouts" aria-live="polite">
@@ -81,6 +82,7 @@ app.innerHTML = `
             <div class="fixation" aria-hidden="true">+</div>
             <div id="central" class="central" hidden></div>
             <div id="peripheral" class="peripheral" hidden aria-hidden="true">𓅝</div>
+            <div id="distractors" class="distractors" aria-hidden="true"></div>
             <div id="field-message" class="field-message">Ready</div>
           </div>
 
@@ -144,6 +146,7 @@ const summaryCounts = find<HTMLElement>("#summary-counts");
 const field = find<HTMLDivElement>("#field");
 const central = find<HTMLDivElement>("#central");
 const peripheral = find<HTMLDivElement>("#peripheral");
+const distractors = find<HTMLDivElement>("#distractors");
 const fieldMessage = find<HTMLDivElement>("#field-message");
 const response = find<HTMLFormElement>("#response");
 const answerControls = find<HTMLFieldSetElement>("#answer-controls");
@@ -185,6 +188,12 @@ function loadProgress(): void {
         attempts: Math.min(SESSION_LENGTH, Math.max(0, saved.state.attempts)),
         streak: Math.max(0, saved.state.streak),
         presentationMs: Math.max(120, Math.min(1500, saved.state.presentationMs)),
+        // Saves from before distractors existed won't have this field; fall
+        // back to the default rather than invalidating the whole save.
+        distractorCount:
+          typeof saved.state.distractorCount === "number" && Number.isFinite(saved.state.distractorCount)
+            ? Math.max(0, saved.state.distractorCount)
+            : INITIAL_STATE.distractorCount,
       };
       // The true in-session low can predate a reload and isn't persisted;
       // the resumed presentationMs is the best available floor for it.
@@ -267,17 +276,30 @@ function setPhase(next: Phase): void {
   }
 }
 
-function positionPeripheral(position: PeripheralPosition): void {
+function fieldOffset(position: PeripheralPosition): { x: number; y: number } {
   const angle = (position * 45 - 90) * Math.PI / 180;
   const radius = Math.min(field.clientWidth, field.clientHeight) * 0.34;
-  const x = Math.cos(angle) * radius;
-  const y = Math.sin(angle) * radius;
+  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+}
+
+function positionPeripheral(position: PeripheralPosition): void {
+  const { x, y } = fieldOffset(position);
   peripheral.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+}
+
+function renderDistractors(positions: PeripheralPosition[]): void {
+  distractors.innerHTML = positions
+    .map(position => {
+      const { x, y } = fieldOffset(position);
+      return `<span class="distractor" style="transform: translate(calc(-50% + ${x}px), calc(-50% + ${y}px));">𓅝</span>`;
+    })
+    .join("");
 }
 
 function hideStimuli(): void {
   central.hidden = true;
   peripheral.hidden = true;
+  distractors.innerHTML = "";
 }
 
 function clearDialFeedback(): void {
@@ -294,6 +316,7 @@ function markCorrectPosition(position: PeripheralPosition): void {
 function showTrial(activeTrial: Trial): void {
   central.className = `central ${activeTrial.centralSymbol}`;
   positionPeripheral(activeTrial.peripheralPosition);
+  renderDistractors(activeTrial.distractorPositions);
   central.hidden = false;
   peripheral.hidden = false;
 }
@@ -333,7 +356,7 @@ function beginTrial(): void {
   if (phase !== "ready") return;
   feedback.textContent = "";
   delete feedback.dataset.result;
-  trial = createTrial(state.presentationMs);
+  trial = createTrial(state.presentationMs, state.distractorCount);
   presentTrial(trial);
 }
 

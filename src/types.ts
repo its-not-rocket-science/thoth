@@ -5,6 +5,9 @@ export interface Trial {
   centralSymbol: CentralSymbol;
   peripheralPosition: PeripheralPosition;
   presentationMs: number;
+  /** Peripheral positions other than peripheralPosition that also show a
+   *  glyph, to compete for attention. Never contains peripheralPosition. */
+  distractorPositions: PeripheralPosition[];
 }
 
 export interface TrialResponse {
@@ -17,6 +20,8 @@ export interface SessionState {
   attempts: number;
   streak: number;
   presentationMs: number;
+  /** Not yet adjusted by the staircase; a fixed value for now. */
+  distractorCount: number;
 }
 
 export interface SessionSummary {

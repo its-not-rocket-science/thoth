@@ -226,6 +226,17 @@ h2 {
   line-height: 1;
   filter: drop-shadow(0 0 10px rgb(127 216 166 / 45%));
 }
+.distractors { position: absolute; top: 50%; left: 50%; z-index: 1; }
+.distractor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--paper-faint);
+  font-family: serif;
+  font-size: clamp(1.6rem, 4.2vw, 2.6rem);
+  line-height: 1;
+  opacity: 0.6;
+}
 /* Idle-state affordance: before the first trial, a soft breathing glow
    behind the fixation cross hints that the field is waiting on input,
    rather than reading as an inert blank grid. Reuses the same translucent
