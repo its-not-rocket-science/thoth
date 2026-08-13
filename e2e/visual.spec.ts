@@ -20,23 +20,27 @@ test.describe("visual regression", () => {
 
   test("showing phase", async ({ page }) => {
     await withDeterministicTrial(page);
-    await page.clock.install();
     await page.goto("/thoth/");
     await page.getByRole("button", { name: "Start trial" }).click();
-    // Past the fixed 650ms "preparing" delay, inside the flash itself.
-    await page.clock.fastForward(700);
-    await expect(page.locator("#central")).toBeVisible();
+    // A flat real wait, not page.clock.fastForward() or a bare polling
+    // assert: fastForward only fires the already-scheduled 650ms "preparing"
+    // timer, not the 850ms "showing" timer nested inside its own callback,
+    // and a bare toBeVisible()/toBeEnabled() poll was observed resolving
+    // before the app's own setTimeout had actually fired under Docker's
+    // parallel-worker load — this waits comfortably past the 650ms
+    // "preparing" delay before asserting anything.
+    await page.waitForTimeout(900);
+    await expect(page.locator("#central")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator(".game-card")).toHaveScreenshot("showing.png");
   });
 
   test("responding phase", async ({ page }) => {
     await withDeterministicTrial(page);
-    await page.clock.install();
     await page.goto("/thoth/");
     await page.getByRole("button", { name: "Start trial" }).click();
-    // Past preparing + the default 850ms presentation, into the response form.
-    await page.clock.fastForward(1600);
-    await expect(page.locator("#answer-controls")).toBeEnabled();
+    // Comfortably past preparing (650ms) + the default presentation (850ms).
+    await page.waitForTimeout(1800);
+    await expect(page.locator("#answer-controls")).toBeEnabled({ timeout: 10_000 });
     await expect(page.locator(".game-card")).toHaveScreenshot("responding.png");
   });
 

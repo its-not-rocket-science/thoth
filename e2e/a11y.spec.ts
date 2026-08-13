@@ -33,11 +33,12 @@ test.describe("accessibility", () => {
 
   test("responding phase", async ({ page }) => {
     await withDeterministicTrial(page);
-    await page.clock.install();
     await page.goto("/thoth/");
     await page.getByRole("button", { name: "Start trial" }).click();
-    await page.clock.fastForward(1600);
-    await expect(page.locator("#answer-controls")).toBeEnabled();
+    // See the comment in e2e/visual.spec.ts's "responding phase" test: a
+    // flat real wait proved more reliable here than a bare polling assert.
+    await page.waitForTimeout(1800);
+    await expect(page.locator("#answer-controls")).toBeEnabled({ timeout: 10_000 });
     const found = await violations(page);
     expect(found, describeViolations(found)).toEqual([]);
   });

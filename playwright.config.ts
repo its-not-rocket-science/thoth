@@ -9,6 +9,13 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:4173",
     trace: "off",
+    // Without these, Chromium can throttle a page's timers as if it were an
+    // occluded/background tab (especially under parallel workers sharing
+    // one browser process), which desyncs the app's own setTimeout-driven
+    // phase timing from real wall-clock waits in the tests below.
+    launchOptions: {
+      args: ["--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding"],
+    },
   },
   webServer: {
     command: "npm run preview -- --port 4173",

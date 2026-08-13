@@ -16,16 +16,14 @@ interface SavedProgress {
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root not found.");
 
-// A stylised wading-bird silhouette rendered as an inline SVG rather than the
-// Unicode ibis glyph (U+1315D, Egyptian Hieroglyphs) it replaces — that block
-// has essentially no real-world font coverage and rendered as invisible for
-// most users. currentColor lets it inherit .peripheral's phosphor glow and
-// .distractor's dimmed style, same approach as the header's brand-mark icon.
+// A stylised bird-in-flight mark (the classic two-arc "gull" glyph) rendered
+// as an inline SVG rather than the Unicode ibis glyph (U+1315D, Egyptian
+// Hieroglyphs) it replaces — that block has essentially no real-world font
+// coverage and rendered as invisible for most users. currentColor lets it
+// inherit .peripheral's phosphor glow and .distractor's dimmed style, same
+// approach as the header's brand-mark icon.
 const IBIS_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-  <ellipse cx="9" cy="15" rx="5" ry="3" fill="currentColor" />
-  <path d="M13 13C15 10.5 17 7.5 18 5C19 7 19.5 8.5 20 9.5C21 10 21.8 10.6 22 11C20.8 11.2 19.6 11 18.6 10.4C17 12 15 13.5 13.3 14.2Z" fill="currentColor" />
-  <line x1="8" y1="18" x2="7" y2="22" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
-  <line x1="11" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+  <path d="M2 16Q7 9 12 15Q17 9 22 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 </svg>`;
 
 // The answer dial mirrors the stimulus field's own geometry exactly, so the
