@@ -16,6 +16,18 @@ interface SavedProgress {
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root not found.");
 
+// A stylised wading-bird silhouette rendered as an inline SVG rather than the
+// Unicode ibis glyph (U+1315D, Egyptian Hieroglyphs) it replaces — that block
+// has essentially no real-world font coverage and rendered as invisible for
+// most users. currentColor lets it inherit .peripheral's phosphor glow and
+// .distractor's dimmed style, same approach as the header's brand-mark icon.
+const IBIS_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <ellipse cx="9" cy="15" rx="5" ry="3" fill="currentColor" />
+  <path d="M13 13C15 10.5 17 7.5 18 5C19 7 19.5 8.5 20 9.5C21 10 21.8 10.6 22 11C20.8 11.2 19.6 11 18.6 10.4C17 12 15 13.5 13.3 14.2Z" fill="currentColor" />
+  <line x1="8" y1="18" x2="7" y2="22" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+  <line x1="11" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+</svg>`;
+
 // The answer dial mirrors the stimulus field's own geometry exactly, so the
 // control a player uses to answer looks like the instrument that produced
 // the stimulus. Position 0 sits at 12 o'clock; positions advance clockwise,
@@ -84,7 +96,7 @@ app.innerHTML = `
           <div id="field" class="field" role="group" aria-label="Visual stimulus field">
             <div class="fixation" aria-hidden="true">+</div>
             <div id="central" class="central" hidden></div>
-            <div id="peripheral" class="peripheral" hidden aria-hidden="true">𓅝</div>
+            <div id="peripheral" class="peripheral" hidden aria-hidden="true">${IBIS_SVG}</div>
             <div id="distractors" class="distractors" aria-hidden="true"></div>
             <div id="field-message" class="field-message">Ready</div>
           </div>
@@ -323,7 +335,7 @@ function renderDistractors(positions: PeripheralPosition[]): void {
   distractors.innerHTML = positions
     .map(position => {
       const { x, y } = fieldOffset(position);
-      return `<span class="distractor" style="transform: translate(calc(-50% + ${x}px), calc(-50% + ${y}px));">𓅝</span>`;
+      return `<span class="distractor" style="transform: translate(calc(-50% + ${x}px), calc(-50% + ${y}px));">${IBIS_SVG}</span>`;
     })
     .join("");
 }

@@ -214,7 +214,7 @@ If the repository name changes, update `base` in `vite.config.ts`.
 
 - [x] Define and document a validated staircase algorithm
 - [x] Separate difficulty dimensions
-- [ ] Add session summaries and progress history
+- [x] Add session summaries and progress history
 - [x] Test floor and ceiling behaviour
 
 Both adaptive dimensions use a standard **2-down-1-up** staircase
