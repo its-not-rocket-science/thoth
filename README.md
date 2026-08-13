@@ -135,6 +135,31 @@ npm run build
 npm run preview
 ```
 
+### Visual regression tests
+
+`e2e/visual.spec.ts` screenshots the built app in each major UI phase (ready,
+showing, responding, complete) and compares against the committed baseline
+PNGs in `e2e/visual.spec.ts-snapshots/`, failing the build on an unexpected
+diff. CI runs this after `npm run build` and before deploying, inside the
+same `mcr.microsoft.com/playwright` Docker image the baselines were recorded
+in — comparing screenshots taken on different operating systems produces
+false failures from font/anti-aliasing differences alone, so recording and
+comparing must happen in the same environment.
+
+To run it locally against the same image CI uses:
+
+```bash
+docker run --rm -v "$PWD:/work" -w /work mcr.microsoft.com/playwright:v1.62.1-noble \
+  bash -lc "npm install --no-audit --no-fund && npm run build && npx playwright test"
+```
+
+When a change is deliberately supposed to look different, regenerate the
+baselines the same way (add `--update-snapshots`, or run
+`npm run test:visual:update` inside the container) and commit the updated
+PNGs alongside the change. Keep the Docker image tag here, in
+`playwright.config.ts`'s comment, and in `.github/workflows/deploy.yml`'s
+`container:` in sync with the `@playwright/test` version in `package.json`.
+
 ## Deployment
 
 The project is configured for:
@@ -179,7 +204,7 @@ If the repository name changes, update `base` in `vite.config.ts`.
 - [ ] Observed-duration recording
 - [ ] Guided practice trials
 - [ ] Seeded sessions
-- [ ] Broader unit and browser tests
+- [x] Broader unit and browser tests
 
 ### Phase 2 — adaptation
 
