@@ -18,10 +18,12 @@ export interface TrialResponse {
 export interface SessionState {
   score: number;
   attempts: number;
-  streak: number;
   presentationMs: number;
-  /** Not yet adjusted by the staircase; a fixed value for now. */
+  /** Consecutive correct responses since presentationMs last stepped. */
+  presentationStreak: number;
   distractorCount: number;
+  /** Consecutive correct responses since distractorCount last stepped. */
+  distractorStreak: number;
 }
 
 export interface SessionSummary {

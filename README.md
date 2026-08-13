@@ -208,10 +208,33 @@ If the repository name changes, update `base` in `vite.config.ts`.
 
 ### Phase 2 — adaptation
 
-- [ ] Define and document a validated staircase algorithm
-- [ ] Separate difficulty dimensions
+- [x] Define and document a validated staircase algorithm
+- [x] Separate difficulty dimensions
 - [ ] Add session summaries and progress history
-- [ ] Test floor and ceiling behaviour
+- [x] Test floor and ceiling behaviour
+
+Both adaptive dimensions use a standard **2-down-1-up** staircase
+(`stepStaircase` in `src/game.ts`): two consecutive correct responses step
+difficulty up one notch and reset the streak, so the *next* step again needs
+two fresh correct responses; a single incorrect response steps difficulty
+back down immediately and also resets the streak. This is the classic
+transformed up-down rule (Levitt, 1971) and targets roughly 70.7% asymptotic
+accuracy.
+
+Each dimension is tracked independently in `SessionState` (its own value and
+its own streak), even though both currently react to the same correct/
+incorrect stream:
+
+| Dimension | State fields | Range | Harder step | Easier step |
+| --- | --- | --- | --- | --- |
+| Presentation interval | `presentationMs` / `presentationStreak` | 120–1500ms | ×0.9 (shorter) | ×1.15 (longer) |
+| Distractor count | `distractorCount` / `distractorStreak` | 0–5 | +1 | −1 |
+
+`scoreTrial` (src/game.ts) just wires each dimension's current
+`{ value, streak }` through `stepStaircase` with its own config
+(`PRESENTATION_STAIRCASE`, `DISTRACTOR_STAIRCASE`) — it holds no staircase
+logic itself. Saved sessions from before a dimension existed fall back to
+that dimension's default rather than being discarded.
 
 ### Phase 3 — evaluation
 

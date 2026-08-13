@@ -13,9 +13,69 @@ const SYMBOLS: CentralSymbol[] = ["circle", "diamond"];
 export const INITIAL_STATE: SessionState = {
   score: 0,
   attempts: 0,
-  streak: 0,
   presentationMs: 850,
+  presentationStreak: 0,
   distractorCount: 2,
+  distractorStreak: 0,
+};
+
+/**
+ * A standard 2-down-1-up staircase: two consecutive correct responses step
+ * difficulty up one notch (and reset the streak so the *next* step again
+ * needs two fresh correct responses); a single incorrect response steps
+ * difficulty back down one notch immediately (and also resets the streak).
+ * This targets ~70.7% asymptotic accuracy, the classic property of 2-down-1-up
+ * (see Levitt 1971, "Transformed Up-Down Methods in Psychoacoustics").
+ *
+ * "Up"/"down" here means the *difficulty* direction, not the raw number:
+ * config.harder/easier map the value in whichever direction that dimension's
+ * difficulty actually runs (e.g. shorter presentationMs is harder, but a
+ * higher distractorCount is harder), so both dimensions share this one rule.
+ */
+export interface StaircaseConfig {
+  min: number;
+  max: number;
+  /** Consecutive correct responses required before stepping harder. */
+  streakToStep: number;
+  harder: (value: number) => number;
+  easier: (value: number) => number;
+}
+
+export interface StaircaseState {
+  value: number;
+  streak: number;
+}
+
+function clampStep(value: number, config: StaircaseConfig): number {
+  return Math.min(config.max, Math.max(config.min, Math.round(value)));
+}
+
+export function stepStaircase(state: StaircaseState, correct: boolean, config: StaircaseConfig): StaircaseState {
+  if (!correct) {
+    return { value: clampStep(config.easier(state.value), config), streak: 0 };
+  }
+
+  const streak = state.streak + 1;
+  if (streak >= config.streakToStep) {
+    return { value: clampStep(config.harder(state.value), config), streak: 0 };
+  }
+  return { value: state.value, streak };
+}
+
+export const PRESENTATION_STAIRCASE: StaircaseConfig = {
+  min: 120,
+  max: 1500,
+  streakToStep: 2,
+  harder: value => value * 0.9,
+  easier: value => value * 1.15,
+};
+
+export const DISTRACTOR_STAIRCASE: StaircaseConfig = {
+  min: 0,
+  max: 5,
+  streakToStep: 2,
+  harder: value => value + 1,
+  easier: value => value - 1,
 };
 
 function randomItem<T>(items: readonly T[]): T {
@@ -60,21 +120,24 @@ export function scoreTrial(
     trial.centralSymbol === response.centralSymbol &&
     trial.peripheralPosition === response.peripheralPosition;
 
-  const streak = correct ? state.streak + 1 : 0;
-  let presentationMs = state.presentationMs;
-
-  if (correct && streak >= 2) {
-    presentationMs = Math.max(120, Math.round(presentationMs * 0.9));
-  } else if (!correct) {
-    presentationMs = Math.min(1500, Math.round(presentationMs * 1.15));
-  }
+  const presentation = stepStaircase(
+    { value: state.presentationMs, streak: state.presentationStreak },
+    correct,
+    PRESENTATION_STAIRCASE,
+  );
+  const distractors = stepStaircase(
+    { value: state.distractorCount, streak: state.distractorStreak },
+    correct,
+    DISTRACTOR_STAIRCASE,
+  );
 
   return {
     score: state.score + (correct ? 1 : 0),
     attempts: state.attempts + 1,
-    streak,
-    presentationMs,
-    distractorCount: state.distractorCount,
+    presentationMs: presentation.value,
+    presentationStreak: presentation.streak,
+    distractorCount: distractors.value,
+    distractorStreak: distractors.streak,
   };
 }
 

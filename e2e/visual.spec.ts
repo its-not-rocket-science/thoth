@@ -46,7 +46,7 @@ test.describe("visual regression", () => {
         localStorage.setItem(
           key,
           JSON.stringify({
-            state: { score: 16, attempts: 20, streak: 0, presentationMs: 700 },
+            state: { score: 16, attempts: 20, presentationMs: 700, presentationStreak: 0, distractorCount: 2, distractorStreak: 0 },
             bestPresentationMs: 620,
           }),
         );

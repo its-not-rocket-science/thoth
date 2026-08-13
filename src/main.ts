@@ -173,8 +173,14 @@ let timers: number[] = [];
 function validState(candidate: unknown): candidate is SessionState {
   if (!candidate || typeof candidate !== "object") return false;
   const value = candidate as Partial<SessionState>;
-  return [value.score, value.attempts, value.streak, value.presentationMs]
+  return [value.score, value.attempts, value.presentationMs]
     .every(item => typeof item === "number" && Number.isFinite(item));
+}
+
+/** Reads a field the schema may not have had yet, falling back rather than
+ *  invalidating the whole save when an older version's save is loaded. */
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function loadProgress(): void {
@@ -183,17 +189,14 @@ function loadProgress(): void {
     if (!raw) return;
     const saved = JSON.parse(raw) as Partial<SavedProgress>;
     if (validState(saved.state)) {
+      const savedState = saved.state as Partial<SessionState>;
       state = {
         score: Math.max(0, saved.state.score),
         attempts: Math.min(SESSION_LENGTH, Math.max(0, saved.state.attempts)),
-        streak: Math.max(0, saved.state.streak),
         presentationMs: Math.max(120, Math.min(1500, saved.state.presentationMs)),
-        // Saves from before distractors existed won't have this field; fall
-        // back to the default rather than invalidating the whole save.
-        distractorCount:
-          typeof saved.state.distractorCount === "number" && Number.isFinite(saved.state.distractorCount)
-            ? Math.max(0, saved.state.distractorCount)
-            : INITIAL_STATE.distractorCount,
+        presentationStreak: Math.max(0, numberOr(savedState.presentationStreak, 0)),
+        distractorCount: Math.max(0, numberOr(savedState.distractorCount, INITIAL_STATE.distractorCount)),
+        distractorStreak: Math.max(0, numberOr(savedState.distractorStreak, 0)),
       };
       // The true in-session low can predate a reload and isn't persisted;
       // the resumed presentationMs is the best available floor for it.

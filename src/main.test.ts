@@ -96,7 +96,7 @@ describe("localStorage round-trip", () => {
   it("rejects a saved state with the wrong shape", async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ state: { score: "not-a-number", attempts: 2, streak: 0, presentationMs: 850 } }),
+      JSON.stringify({ state: { score: "not-a-number", attempts: 2, presentationMs: 850 } }),
     );
     await loadApp();
     expect(document.querySelector("#score")?.textContent).toBe("0");
@@ -127,7 +127,7 @@ describe("session completion", () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        state: { score: 15, attempts: SESSION_LENGTH - 1, streak: 0, presentationMs: 850 },
+        state: { score: 15, attempts: SESSION_LENGTH - 1, presentationMs: 850 },
         bestPresentationMs: null,
       }),
     );
