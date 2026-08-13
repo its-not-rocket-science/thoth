@@ -51,7 +51,7 @@ app.innerHTML = `
 
     <aside class="notice"><strong>Research prototype —</strong> not a medical device and not shown to prevent or treat dementia.</aside>
 
-    <section class="game-card" aria-labelledby="game-heading">
+    <section class="game-card" aria-labelledby="game-heading" aria-describedby="vision-note">
       <div class="heading-row">
         <div>
           <p class="eyebrow">Exercise No.&nbsp;01</p>
@@ -59,6 +59,8 @@ app.innerHTML = `
         </div>
         <div class="session-label"><strong id="progress-text">0 of ${SESSION_LENGTH}</strong> trials completed</div>
       </div>
+
+      <p id="vision-note" class="vision-note">This is a timed visual exercise and requires sight to play; it is not screen-reader navigable.</p>
 
       <div class="progress-track" role="progressbar" aria-label="Session progress" aria-valuemin="0" aria-valuemax="${SESSION_LENGTH}" aria-valuenow="0">
         <div id="progress-fill" class="progress-fill"></div>

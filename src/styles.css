@@ -127,6 +127,7 @@ h2 {
   white-space: nowrap;
 }
 .session-label strong { color: var(--paper); font-weight: 600; }
+.vision-note { margin: 0.4rem 0 0; color: var(--paper-faint); font-size: 0.82rem; }
 .instructions { max-width: 60rem; margin: 0.9rem 0 1.1rem; color: var(--paper-dim); line-height: 1.55; }
 .instructions strong { color: var(--paper); font-weight: 600; }
 

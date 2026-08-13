@@ -47,6 +47,10 @@ Thoth is not currently intended to diagnose cognitive impairment, estimate demen
 
 Improvement within the game must not automatically be interpreted as improvement in general cognition or everyday functioning.
 
+## Vision dependency
+
+This exercise is inherently a timed visual task: it asks the player to briefly perceive a central shape and a peripheral glyph within a fraction of a second. That cannot be made screen-reader navigable without defeating its purpose — a non-visual equivalent would be a different task, not an accessible version of this one. Thoth is checked against automated accessibility rules (see `e2e/a11y.spec.ts`) for the parts of the interface that are not the timed stimulus itself — labelling, contrast, keyboard operability, focus order — but the core exercise will remain unavailable to players who cannot see the screen.
+
 ## Research background
 
 ### ACTIVE trial
