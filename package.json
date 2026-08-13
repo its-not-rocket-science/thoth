@@ -13,7 +13,8 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:visual": "playwright test",
-    "test:visual:update": "playwright test --update-snapshots"
+    "test:visual:update": "playwright test --update-snapshots",
+    "generate:favicons": "node scripts/generate-favicons.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
