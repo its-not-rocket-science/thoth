@@ -415,6 +415,36 @@ legend {
 .summary-panel .eyebrow { margin-bottom: 0.85rem; }
 .summary-panel .readouts { margin-bottom: 0; }
 
+.history { margin-top: 1.25rem; }
+.history .eyebrow { margin-bottom: 0.5rem; }
+.history-empty { margin: 0; color: var(--paper-faint); font-size: 0.85rem; }
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 0.4rem;
+  background: var(--hairline-soft);
+  list-style: none;
+  overflow: hidden;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.7rem;
+  background: var(--panel-sunken);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.history-date { color: var(--paper-faint); }
+.history-accuracy { color: var(--paper); font-weight: 500; }
+.history-interval { color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+.history-interval .unit { margin-left: 0.1rem; color: var(--paper-faint); font-size: 0.85em; }
+
 footer { padding-top: 1.5rem; color: var(--paper-faint); font-size: 0.82rem; text-align: center; }
 
 /* ---------------------------------------------------------------------- */

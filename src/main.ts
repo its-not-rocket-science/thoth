@@ -1,5 +1,6 @@
 import "./styles.css";
 import { createTrial, INITIAL_STATE, scoreTrial, summarizeSession } from "./game";
+import { loadHistory, recordSession } from "./history";
 import type { CentralSymbol, PeripheralPosition, SessionState, Trial } from "./types";
 
 const STORAGE_KEY = "thoth-progress-v1";
@@ -122,6 +123,7 @@ app.innerHTML = `
             <div class="readout"><dt>Lowest interval</dt><dd id="summary-lowest">—</dd></div>
             <div class="readout"><dt>Correct / incorrect</dt><dd id="summary-counts">0 / 0</dd></div>
           </dl>
+          <div id="summary-history" class="history"></div>
         </section>
       </div>
 
@@ -143,6 +145,7 @@ const summaryScore = find<HTMLElement>("#summary-score");
 const summaryAccuracy = find<HTMLElement>("#summary-accuracy");
 const summaryLowest = find<HTMLElement>("#summary-lowest");
 const summaryCounts = find<HTMLElement>("#summary-counts");
+const summaryHistory = find<HTMLDivElement>("#summary-history");
 const field = find<HTMLDivElement>("#field");
 const central = find<HTMLDivElement>("#central");
 const peripheral = find<HTMLDivElement>("#peripheral");
@@ -238,12 +241,36 @@ function updateStats(): void {
   progressTrack.setAttribute("aria-valuenow", String(completed));
 }
 
+function renderHistory(): void {
+  const history = loadHistory(localStorage);
+  if (history.length === 0) {
+    summaryHistory.innerHTML = `<p class="history-empty">No past sessions yet.</p>`;
+    return;
+  }
+
+  const rows = history
+    .map(entry => {
+      const date = new Date(entry.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      return `<li class="history-row">
+        <span class="history-date">${date}</span>
+        <span class="history-accuracy">${entry.accuracyPct}%</span>
+        <span class="history-interval">${entry.lowestPresentationMs}<span class="unit">ms</span></span>
+      </li>`;
+    })
+    .join("");
+  summaryHistory.innerHTML = `
+    <p class="eyebrow">Recent sessions</p>
+    <ul class="history-list">${rows}</ul>
+  `;
+}
+
 function renderSummary(): void {
   const summary = summarizeSession(state, sessionLowestMs);
   summaryScore.textContent = `${summary.score} / ${SESSION_LENGTH}`;
   summaryAccuracy.textContent = `${summary.accuracyPct}%`;
   summaryLowest.textContent = `${summary.lowestPresentationMs} ms`;
   summaryCounts.textContent = `${summary.correct} / ${summary.incorrect}`;
+  renderHistory();
 }
 
 function setPhase(next: Phase): void {
@@ -432,7 +459,21 @@ response.addEventListener("submit", event => {
   trial = null;
   saveProgress();
   updateStats();
-  setPhase(state.attempts >= SESSION_LENGTH ? "complete" : "ready");
+
+  const sessionJustCompleted = state.attempts >= SESSION_LENGTH;
+  if (sessionJustCompleted) {
+    const summary = summarizeSession(state, sessionLowestMs);
+    recordSession(
+      {
+        timestamp: Date.now(),
+        score: summary.score,
+        accuracyPct: summary.accuracyPct,
+        lowestPresentationMs: summary.lowestPresentationMs,
+      },
+      localStorage,
+    );
+  }
+  setPhase(sessionJustCompleted ? "complete" : "ready");
   start.focus();
 });
 

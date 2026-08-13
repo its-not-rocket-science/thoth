@@ -34,3 +34,10 @@ export interface SessionSummary {
   incorrect: number;
   lowestPresentationMs: number;
 }
+
+export interface SessionHistoryEntry {
+  timestamp: number;
+  score: number;
+  accuracyPct: number;
+  lowestPresentationMs: number;
+}
