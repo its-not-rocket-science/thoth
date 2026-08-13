@@ -42,10 +42,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Visual regression
+      - name: Playwright e2e checks (visual regression + accessibility)
         run: npx playwright test
 
-      - name: Upload visual diff artifacts
+      - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:

@@ -79,7 +79,7 @@ app.innerHTML = `
 
       <div id="game-layout" class="game-layout">
         <div class="field-column">
-          <div id="field" class="field" aria-label="Visual stimulus field">
+          <div id="field" class="field" role="group" aria-label="Visual stimulus field">
             <div class="fixation" aria-hidden="true">+</div>
             <div id="central" class="central" hidden></div>
             <div id="peripheral" class="peripheral" hidden aria-hidden="true">𓅝</div>
