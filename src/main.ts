@@ -111,19 +111,19 @@ app.innerHTML = `
             <button class="primary submit-answer" type="submit">Submit answer</button>
           </fieldset>
         </form>
+
+        <section id="summary" class="summary-panel" hidden aria-labelledby="summary-heading">
+          <p class="eyebrow" id="summary-heading">Session complete</p>
+          <dl class="readouts">
+            <div class="readout"><dt>Score</dt><dd id="summary-score">0 / ${SESSION_LENGTH}</dd></div>
+            <div class="readout"><dt>Accuracy</dt><dd id="summary-accuracy">—</dd></div>
+            <div class="readout"><dt>Lowest interval</dt><dd id="summary-lowest">—</dd></div>
+            <div class="readout"><dt>Correct / incorrect</dt><dd id="summary-counts">0 / 0</dd></div>
+          </dl>
+        </section>
       </div>
 
       <p id="feedback" class="feedback" aria-live="assertive"></p>
-
-      <section id="summary" class="summary-panel" hidden aria-labelledby="summary-heading">
-        <p class="eyebrow" id="summary-heading">Session complete</p>
-        <dl class="readouts">
-          <div class="readout"><dt>Score</dt><dd id="summary-score">0 / ${SESSION_LENGTH}</dd></div>
-          <div class="readout"><dt>Accuracy</dt><dd id="summary-accuracy">—</dd></div>
-          <div class="readout"><dt>Lowest interval</dt><dd id="summary-lowest">—</dd></div>
-          <div class="readout"><dt>Correct / incorrect</dt><dd id="summary-counts">0 / 0</dd></div>
-        </dl>
-      </section>
     </section>
 
     <footer>Progress is saved in this browser using web storage. No analytics or account required.</footer>
@@ -136,7 +136,6 @@ function find<T extends Element>(selector: string): T {
   return element;
 }
 
-const gameLayout = find<HTMLDivElement>("#game-layout");
 const summaryPanel = find<HTMLElement>("#summary");
 const summaryScore = find<HTMLElement>("#summary-score");
 const summaryAccuracy = find<HTMLElement>("#summary-accuracy");
@@ -246,8 +245,7 @@ function setPhase(next: Phase): void {
   pause.disabled = complete;
   replay.disabled = !(phase === "responding" && trial !== null);
   start.disabled = !["ready", "complete"].includes(phase);
-  gameLayout.hidden = complete;
-  feedback.hidden = complete;
+  response.hidden = complete;
   summaryPanel.hidden = !complete;
   field.classList.toggle("field--idle", phase === "ready" && state.attempts === 0);
 
