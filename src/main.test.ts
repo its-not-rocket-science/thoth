@@ -105,6 +105,7 @@ describe("localStorage round-trip", () => {
     expect(readoutValue("#readouts", "Correct")).toBe("1");
 
     await loadApp();
+    selectCentreAndEdge();
     expect(readoutValue("#readouts", "Correct")).toBe("1");
     expect(document.querySelector("#progress-text")?.textContent).toBe("1 of 20");
   });
@@ -112,6 +113,7 @@ describe("localStorage round-trip", () => {
   it("rejects unparsable saved data instead of throwing", async () => {
     localStorage.setItem(CENTRE_EDGE_PROGRESS_KEY, "{not json");
     await expect(loadApp()).resolves.not.toThrow();
+    selectCentreAndEdge();
     expect(readoutValue("#readouts", "Correct")).toBe("0");
     expect(localStorage.getItem(CENTRE_EDGE_PROGRESS_KEY)).toBeNull();
   });
@@ -122,6 +124,7 @@ describe("localStorage round-trip", () => {
       JSON.stringify({ session: { score: "not-a-number", attempts: 2, presentationMs: 850 } }),
     );
     await loadApp();
+    selectCentreAndEdge();
     expect(readoutValue("#readouts", "Correct")).toBe("0");
     expect(document.querySelector("#progress-text")?.textContent).toBe("0 of 20");
   });
@@ -142,13 +145,12 @@ describe("legacy storage migration", () => {
     );
 
     await loadApp();
+    selectCentreAndEdge();
 
     expect(localStorage.getItem(LEGACY_PROGRESS_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_HISTORY_KEY)).toBeNull();
     expect(localStorage.getItem(CENTRE_EDGE_PROGRESS_KEY)).not.toBeNull();
 
-    // The migrated save's score/attempts show up immediately, since
-    // centre-edge is the default active exercise.
     expect(readoutValue("#readouts", "Correct")).toBe("7");
     expect(document.querySelector("#progress-text")?.textContent).toBe("9 of 20");
   });
@@ -168,6 +170,7 @@ describe("legacy storage migration", () => {
     );
 
     await loadApp();
+    selectCentreAndEdge();
 
     expect(localStorage.getItem(LEGACY_PROGRESS_KEY)).toBeNull();
     expect(readoutValue("#readouts", "Correct")).toBe("5");

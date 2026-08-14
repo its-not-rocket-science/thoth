@@ -9,15 +9,13 @@ An open-source, browser-based visual processing and divided-attention training g
 
 This repository contains an early playable prototype.
 
-The first exercise asks the player to:
+The exercises mirror the three official subtests of the clinical Useful Field of View (UFOV) instrument (see [Useful field of view](#useful-field-of-view) below), each independently scored and progressed:
 
-1. focus on the centre of the screen;
-2. briefly identify a central target;
-3. simultaneously detect a target in the peripheral visual field;
-4. report both answers; and
-5. continue at an adaptively adjusted level of difficulty.
+1. **Centre only** — briefly identify a central target alone (pure processing speed).
+2. **Centre and edge** — identify the central target while simultaneously localising a target in the peripheral visual field (divided attention).
+3. **Centre and edge, with distractors** — the same divided-attention task with the peripheral target embedded among decoy glyphs (selective attention).
 
-The project is inspired by published research into visual speed-of-processing training and the useful field of view. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
+All three continue at an adaptively adjusted level of difficulty. The project is inspired by published research into visual speed-of-processing training and the useful field of view. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
 ## About the name
 
@@ -49,7 +47,7 @@ Improvement within the game must not automatically be interpreted as improvement
 
 ## Vision dependency
 
-This exercise is inherently a timed visual task: it asks the player to briefly perceive a central shape and a peripheral glyph within a fraction of a second. That cannot be made screen-reader navigable without defeating its purpose — a non-visual equivalent would be a different task, not an accessible version of this one. Thoth is checked against automated accessibility rules (see `e2e/a11y.spec.ts`) for the parts of the interface that are not the timed stimulus itself — labelling, contrast, keyboard operability, focus order — but the core exercise will remain unavailable to players who cannot see the screen.
+Every exercise is inherently a timed visual task: each asks the player to briefly perceive a central shape, in most cases along with a peripheral glyph, within a fraction of a second. That cannot be made screen-reader navigable without defeating its purpose — a non-visual equivalent would be a different task, not an accessible version of this one. Thoth is checked against automated accessibility rules (see `e2e/a11y.spec.ts`) for the parts of the interface that are not the timed stimulus itself — labelling, contrast, keyboard operability, focus order — but the core exercise will remain unavailable to players who cannot see the screen.
 
 ## Research background
 
@@ -82,7 +80,9 @@ The biomarker findings reported in news coverage should be treated as preliminar
 
 ### Useful field of view
 
-The useful field of view is the visual area from which information can be acquired during a brief glance without moving the eyes or head. Relevant tasks can combine central discrimination, peripheral target localisation, brief presentation times and visual distractors.
+The useful field of view is the visual area from which information can be acquired during a brief glance without moving the eyes or head. The clinical UFOV instrument has three official subtests — central discrimination alone, central discrimination with simultaneous peripheral localisation, and the same task with the peripheral target embedded among distractors — and Thoth's three exercises deliberately mirror that structure rather than blending it into one task:
+
+- Ball K, Owsley C. **The Useful Field of View Test: a new technique for evaluating age-related declines in visual function.** *Journal of the American Optometric Association*. 1993;64(1):71–79.
 
 Background reading:
 

@@ -2,13 +2,18 @@ import { createTrial, INITIAL_STATE, scoreTrial, summarizeSession } from "../gam
 import type { Exercise, ReadoutCell } from "../exercise";
 import type { CentralSymbol, PeripheralPosition, SessionState, Trial } from "../types";
 
-export interface CentreEdgeState {
+export interface UfovState {
   session: SessionState;
   bestPresentationMs: number | null;
   /** Lowest presentationMs reached this session; the staircase can move it
    *  back up after a miss, so SessionState alone can't answer "how low did
    *  we get". Reset each fresh session. */
   sessionLowestMs: number;
+}
+
+interface Answer {
+  centralSymbol: CentralSymbol;
+  peripheralPosition: PeripheralPosition;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -49,10 +54,34 @@ function dialPointsHtml(): string {
 
 const SESSION_LENGTH = 20;
 
-/** "Centre and edge": the original divided-attention exercise, unchanged in
- *  behavior from before the multi-exercise refactor. Wrapped as an
- *  Exercise so main.ts no longer hardcodes it. */
-export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
+export interface UfovConfig {
+  id: string;
+  number: number;
+  name: string;
+  instructions: string;
+  /** Subtest 1 (centre-only) has no peripheral target at all: no dial, no
+   *  ibis, no distractors, response is the shape alone. Subtests 2 and 3
+   *  both show the peripheral target and ask for its position. */
+  peripheralEnabled: boolean;
+  /** Subtest 3 only: selective-attention distractor glyphs, staircase-
+   *  controlled via SessionState.distractorCount. Subtests 1 and 2 always
+   *  create trials with distractorCount forced to 0 — the distractor
+   *  staircase in SessionState still exists and steps under the hood
+   *  (scoreTrial doesn't know it's being ignored), it's just never read by
+   *  createTrial for these two. */
+  distractorsEnabled: boolean;
+}
+
+/**
+ * Factory for the three official UFOV subtests (Ball & Owsley, 1993):
+ * central discrimination alone, central + peripheral localisation (divided
+ * attention), and central + peripheral among distractors (selective
+ * attention) — see createCentreOnlyExercise / createCentreEdgeExercise /
+ * createCentreEdgeDistractorsExercise below. All three share this one
+ * implementation, reusing game.ts's createTrial/scoreTrial/staircase logic
+ * unchanged; only what's shown and asked for differs.
+ */
+export function createUfovExercise(config: UfovConfig): Exercise<UfovState, Trial> {
   let field: HTMLElement | null = null;
   let central: HTMLDivElement | null = null;
   let peripheral: HTMLDivElement | null = null;
@@ -66,13 +95,10 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
   }
 
   return {
-    id: "centre-edge",
-    number: 1,
-    name: "Centre and edge",
-    instructions:
-      "Keep your eyes on the centre. A <strong>circle or diamond</strong> will appear there " +
-      "while an ibis appears at one of eight positions around it, sometimes alongside a few " +
-      "dimmer decoy glyphs elsewhere. After they vanish, choose the shape and the ibis's position.",
+    id: config.id,
+    number: config.number,
+    name: config.name,
+    instructions: config.instructions,
     sessionLength: SESSION_LENGTH,
 
     initialState: {
@@ -81,7 +107,7 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       sessionLowestMs: INITIAL_STATE.presentationMs,
     },
 
-    loadState(raw: unknown): CentreEdgeState | null {
+    loadState(raw: unknown): UfovState | null {
       if (!raw || typeof raw !== "object") return null;
       const value = raw as Record<string, unknown>;
       // "state" is the pre-multi-exercise field name; loadState tolerates
@@ -108,7 +134,7 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       };
     },
 
-    readouts(state: CentreEdgeState): ReadoutCell[] {
+    readouts(state: UfovState): ReadoutCell[] {
       const { session, bestPresentationMs } = state;
       return [
         { label: "Correct", value: String(session.score) },
@@ -121,7 +147,7 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       ];
     },
 
-    summaryCells(state: CentreEdgeState): ReadoutCell[] {
+    summaryCells(state: UfovState): ReadoutCell[] {
       const summary = summarizeSession(state.session, state.sessionLowestMs);
       return [
         { label: "Score", value: `${summary.score} / ${SESSION_LENGTH}` },
@@ -131,15 +157,15 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       ];
     },
 
-    attempts(state: CentreEdgeState): number {
+    attempts(state: UfovState): number {
       return state.session.attempts;
     },
 
-    isSessionComplete(state: CentreEdgeState): boolean {
+    isSessionComplete(state: UfovState): boolean {
       return state.session.attempts >= SESSION_LENGTH;
     },
 
-    pickerSummary(state: CentreEdgeState): string {
+    pickerSummary(state: UfovState): string {
       if (state.bestPresentationMs === null && state.session.attempts === 0) return "Not played yet";
       const best = state.bestPresentationMs === null ? "—" : `${state.bestPresentationMs}ms`;
       const accuracy =
@@ -147,7 +173,7 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       return `Best ${best} · Last ${state.session.score}/${SESSION_LENGTH} (${accuracy})`;
     },
 
-    historyEntry(state: CentreEdgeState) {
+    historyEntry(state: UfovState) {
       const summary = summarizeSession(state.session, state.sessionLowestMs);
       return { score: summary.score, accuracyPct: summary.accuracyPct, lowestPresentationMs: summary.lowestPresentationMs };
     },
@@ -157,15 +183,23 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       // absolutely positioned); the actual layout box to measure against
       // is its parent, the outer .field element.
       field = fieldContent.closest<HTMLElement>(".field") ?? fieldContent;
-      fieldContent.innerHTML = `
-        <div id="central" class="central" hidden></div>
-        <div id="peripheral" class="peripheral" hidden aria-hidden="true">${IBIS_SVG}</div>
-        <div id="distractors" class="distractors" aria-hidden="true"></div>
-      `;
+
+      fieldContent.innerHTML = config.peripheralEnabled
+        ? `<div id="central" class="central" hidden></div>
+           <div id="peripheral" class="peripheral" hidden aria-hidden="true">${IBIS_SVG}</div>
+           <div id="distractors" class="distractors" aria-hidden="true"></div>`
+        : `<div id="central" class="central" hidden></div>`;
       central = fieldContent.querySelector<HTMLDivElement>("#central");
       peripheral = fieldContent.querySelector<HTMLDivElement>("#peripheral");
       distractors = fieldContent.querySelector<HTMLDivElement>("#distractors");
 
+      const dial = config.peripheralEnabled
+        ? `<p class="question">Ibis position</p>
+           <div class="position-dial" aria-hidden="false">
+             <span class="dial-centre" aria-hidden="true">+</span>
+             ${dialPointsHtml()}
+           </div>`
+        : "";
       answerControls.innerHTML = `
         <legend>What did you see?</legend>
 
@@ -175,18 +209,15 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
           <label><input type="radio" name="central" value="diamond" required><span class="mini diamond"></span>Diamond</label>
         </div>
 
-        <p class="question">Ibis position</p>
-        <div class="position-dial" aria-hidden="false">
-          <span class="dial-centre" aria-hidden="true">+</span>
-          ${dialPointsHtml()}
-        </div>
+        ${dial}
 
         <button class="primary submit-answer" type="submit">Submit answer</button>
       `;
     },
 
-    createTrial(state: CentreEdgeState): Trial {
-      return createTrial(state.session.presentationMs, state.session.distractorCount);
+    createTrial(state: UfovState): Trial {
+      const distractorCount = config.distractorsEnabled ? state.session.distractorCount : 0;
+      return createTrial(state.session.presentationMs, distractorCount);
     },
 
     flashDurationMs(trial: Trial): number {
@@ -194,8 +225,11 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
     },
 
     showTrial(trial: Trial): void {
-      if (!central || !peripheral || !distractors) return;
+      if (!central) return;
       central.className = `central ${trial.centralSymbol}`;
+      central.hidden = false;
+
+      if (!config.peripheralEnabled || !peripheral || !distractors) return;
       const { x, y } = fieldOffset(trial.peripheralPosition);
       peripheral.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
       distractors.innerHTML = trial.distractorPositions
@@ -204,7 +238,6 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
           return `<span class="distractor" style="transform: translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px));">${IBIS_SVG}</span>`;
         })
         .join("");
-      central.hidden = false;
       peripheral.hidden = false;
     },
 
@@ -214,11 +247,13 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       if (distractors) distractors.innerHTML = "";
     },
 
-    readAnswer(response: HTMLFormElement): { centralSymbol: CentralSymbol; peripheralPosition: PeripheralPosition } | null {
+    readAnswer(response: HTMLFormElement): Partial<Answer> | null {
       const data = new FormData(response);
       const centralAnswer = data.get("central") as CentralSymbol | null;
+      if (!centralAnswer) return null;
+      if (!config.peripheralEnabled) return { centralSymbol: centralAnswer };
       const positionRaw = data.get("position");
-      if (!centralAnswer || typeof positionRaw !== "string") return null;
+      if (typeof positionRaw !== "string") return null;
       return {
         centralSymbol: centralAnswer,
         peripheralPosition: Number.parseInt(positionRaw, 10) as PeripheralPosition,
@@ -226,15 +261,21 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
     },
 
     isCorrect(trial: Trial, answer: unknown): boolean {
-      const a = answer as { centralSymbol: CentralSymbol; peripheralPosition: PeripheralPosition };
-      return trial.centralSymbol === a.centralSymbol && trial.peripheralPosition === a.peripheralPosition;
+      const a = answer as Partial<Answer>;
+      if (trial.centralSymbol !== a.centralSymbol) return false;
+      if (!config.peripheralEnabled) return true;
+      return trial.peripheralPosition === a.peripheralPosition;
     },
 
     feedback(trial: Trial, correct: boolean): string {
-      return correct ? "Correct." : `Not quite. It was a ${trial.centralSymbol}, at position ${trial.peripheralPosition + 1}.`;
+      if (correct) return "Correct.";
+      return config.peripheralEnabled
+        ? `Not quite. It was a ${trial.centralSymbol}, at position ${trial.peripheralPosition + 1}.`
+        : `Not quite. It was a ${trial.centralSymbol}.`;
     },
 
     onMiss(trial: Trial): void {
+      if (!config.peripheralEnabled) return;
       const point = document
         .querySelector<HTMLInputElement>(`.dial-point input[value="${trial.peripheralPosition}"]`)
         ?.closest<HTMLElement>(".dial-point");
@@ -245,9 +286,16 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       document.querySelectorAll(".dial-point.correct-answer").forEach(el => el.classList.remove("correct-answer"));
     },
 
-    score(state: CentreEdgeState, trial: Trial, answer: unknown): CentreEdgeState {
-      const a = answer as { centralSymbol: CentralSymbol; peripheralPosition: PeripheralPosition };
-      const session = scoreTrial(state.session, trial, a);
+    score(state: UfovState, trial: Trial, answer: unknown): UfovState {
+      const a = answer as Partial<Answer>;
+      // scoreTrial always compares both fields; centre-only never asks for
+      // a position, so supply the trial's own to make that half trivially
+      // true and let correctness reduce to the shape alone.
+      const fullAnswer: Answer = {
+        centralSymbol: a.centralSymbol as CentralSymbol,
+        peripheralPosition: config.peripheralEnabled ? (a.peripheralPosition as PeripheralPosition) : trial.peripheralPosition,
+      };
+      const session = scoreTrial(state.session, trial, fullAnswer);
       const correct = session.score > state.session.score;
       const bestPresentationMs =
         correct && (state.bestPresentationMs === null || session.presentationMs < state.bestPresentationMs)
@@ -260,4 +308,44 @@ export function createCentreEdgeExercise(): Exercise<CentreEdgeState, Trial> {
       };
     },
   };
+}
+
+export function createCentreOnlyExercise(): Exercise<UfovState, Trial> {
+  return createUfovExercise({
+    id: "centre-only",
+    number: 1,
+    name: "Centre only",
+    instructions:
+      "Keep your eyes on the centre. A <strong>circle or diamond</strong> will appear there briefly. " +
+      "After it vanishes, choose which shape you saw.",
+    peripheralEnabled: false,
+    distractorsEnabled: false,
+  });
+}
+
+export function createCentreEdgeExercise(): Exercise<UfovState, Trial> {
+  return createUfovExercise({
+    id: "centre-edge",
+    number: 2,
+    name: "Centre and edge",
+    instructions:
+      "Keep your eyes on the centre. A <strong>circle or diamond</strong> will appear there " +
+      "while an ibis appears at one of eight positions around it. After they vanish, choose the shape and the ibis's position.",
+    peripheralEnabled: true,
+    distractorsEnabled: false,
+  });
+}
+
+export function createCentreEdgeDistractorsExercise(): Exercise<UfovState, Trial> {
+  return createUfovExercise({
+    id: "centre-edge-distractors",
+    number: 3,
+    name: "Centre and edge, with distractors",
+    instructions:
+      "Keep your eyes on the centre. A <strong>circle or diamond</strong> will appear there " +
+      "while an ibis appears at one of eight positions around it, sometimes alongside a few " +
+      "dimmer decoy glyphs elsewhere. After they vanish, choose the shape and the ibis's position.",
+    peripheralEnabled: true,
+    distractorsEnabled: true,
+  });
 }
