@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const STORAGE_KEY = "thoth-progress-v1";
+const CENTRE_EDGE_PROGRESS_KEY = "thoth-progress-centre-edge-v1";
 
 /** Pins createTrial()'s output to the first item of each pool (circle at
  *  peripheral position 0), so the flash/dial screenshots are reproducible. */
@@ -10,10 +10,18 @@ async function withDeterministicTrial(page: Page): Promise<void> {
   });
 }
 
+/** Centre and edge is the default active exercise, but select it
+ *  explicitly anyway so these tests don't silently depend on registry
+ *  order once more exercises exist. */
+async function selectCentreAndEdge(page: Page): Promise<void> {
+  await page.locator('[data-exercise-id="centre-edge"]').click();
+}
+
 test.describe("visual regression", () => {
   test("ready phase", async ({ page }) => {
     await withDeterministicTrial(page);
     await page.goto("/thoth/");
+    await selectCentreAndEdge(page);
     await expect(page.getByRole("heading", { name: "Centre and edge" })).toBeVisible();
     await expect(page.locator(".game-card")).toHaveScreenshot("ready.png");
   });
@@ -21,6 +29,7 @@ test.describe("visual regression", () => {
   test("showing phase", async ({ page }) => {
     await withDeterministicTrial(page);
     await page.goto("/thoth/");
+    await selectCentreAndEdge(page);
     await page.getByRole("button", { name: "Start trial" }).click();
     // A flat real wait, not page.clock.fastForward() or a bare polling
     // assert: fastForward only fires the already-scheduled 650ms "preparing"
@@ -37,6 +46,7 @@ test.describe("visual regression", () => {
   test("responding phase", async ({ page }) => {
     await withDeterministicTrial(page);
     await page.goto("/thoth/");
+    await selectCentreAndEdge(page);
     await page.getByRole("button", { name: "Start trial" }).click();
     // Comfortably past preparing (650ms) + the default presentation (850ms).
     await page.waitForTimeout(1800);
@@ -50,14 +60,16 @@ test.describe("visual regression", () => {
         localStorage.setItem(
           key,
           JSON.stringify({
-            state: { score: 16, attempts: 20, presentationMs: 700, presentationStreak: 0, distractorCount: 2, distractorStreak: 0 },
+            session: { score: 16, attempts: 20, presentationMs: 700, presentationStreak: 0, distractorCount: 2, distractorStreak: 0 },
             bestPresentationMs: 620,
+            sessionLowestMs: 700,
           }),
         );
       },
-      { key: STORAGE_KEY },
+      { key: CENTRE_EDGE_PROGRESS_KEY },
     );
     await page.goto("/thoth/");
+    await selectCentreAndEdge(page);
     await expect(page.locator("#summary-heading")).toBeVisible();
     await expect(page.locator(".game-card")).toHaveScreenshot("complete.png");
   });

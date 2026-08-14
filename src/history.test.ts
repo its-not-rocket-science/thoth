@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendHistory, HISTORY_STORAGE_KEY, loadHistory, recordSession, saveHistory, type StorageLike } from "./history";
+import { appendHistory, historyStorageKey, loadHistory, recordSession, saveHistory, type StorageLike } from "./history";
 import type { SessionHistoryEntry } from "./types";
 
 class FakeStorage implements StorageLike {
@@ -18,32 +18,41 @@ class FakeStorage implements StorageLike {
   }
 }
 
+const KEY = historyStorageKey("centre-edge");
+
 function entry(overrides: Partial<SessionHistoryEntry> = {}): SessionHistoryEntry {
   return { timestamp: 1000, score: 15, accuracyPct: 75, lowestPresentationMs: 620, ...overrides };
 }
 
+describe("historyStorageKey", () => {
+  it("namespaces the key per exercise id", () => {
+    expect(historyStorageKey("centre-edge")).toBe("thoth-history-centre-edge-v1");
+    expect(historyStorageKey("centre-only")).toBe("thoth-history-centre-only-v1");
+  });
+});
+
 describe("loadHistory", () => {
   it("returns an empty array when nothing is saved", () => {
-    expect(loadHistory(new FakeStorage())).toEqual([]);
+    expect(loadHistory(new FakeStorage(), KEY)).toEqual([]);
   });
 
   it("returns an empty array and clears storage for unparsable JSON", () => {
     const storage = new FakeStorage();
-    storage.setItem(HISTORY_STORAGE_KEY, "{not json");
-    expect(loadHistory(storage)).toEqual([]);
-    expect(storage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+    storage.setItem(KEY, "{not json");
+    expect(loadHistory(storage, KEY)).toEqual([]);
+    expect(storage.getItem(KEY)).toBeNull();
   });
 
   it("returns an empty array for valid JSON that isn't an array", () => {
     const storage = new FakeStorage();
-    storage.setItem(HISTORY_STORAGE_KEY, JSON.stringify({ not: "an array" }));
-    expect(loadHistory(storage)).toEqual([]);
+    storage.setItem(KEY, JSON.stringify({ not: "an array" }));
+    expect(loadHistory(storage, KEY)).toEqual([]);
   });
 
   it("filters out malformed entries while keeping valid ones", () => {
     const storage = new FakeStorage();
     storage.setItem(
-      HISTORY_STORAGE_KEY,
+      KEY,
       JSON.stringify([
         entry({ timestamp: 1 }),
         { score: "not-a-number" },
@@ -52,9 +61,17 @@ describe("loadHistory", () => {
         "just a string",
       ]),
     );
-    const loaded = loadHistory(storage);
+    const loaded = loadHistory(storage, KEY);
     expect(loaded).toHaveLength(2);
     expect(loaded.map(e => e.timestamp)).toEqual([1, 2]);
+  });
+
+  it("keeps different exercises' histories independent", () => {
+    const storage = new FakeStorage();
+    saveHistory([entry({ timestamp: 1 })], storage, historyStorageKey("centre-edge"));
+    saveHistory([entry({ timestamp: 2 }), entry({ timestamp: 3 })], storage, historyStorageKey("centre-only"));
+    expect(loadHistory(storage, historyStorageKey("centre-edge"))).toHaveLength(1);
+    expect(loadHistory(storage, historyStorageKey("centre-only"))).toHaveLength(2);
   });
 });
 
@@ -62,8 +79,8 @@ describe("saveHistory", () => {
   it("round-trips through loadHistory", () => {
     const storage = new FakeStorage();
     const entries = [entry({ timestamp: 1 }), entry({ timestamp: 2 })];
-    saveHistory(entries, storage);
-    expect(loadHistory(storage)).toEqual(entries);
+    saveHistory(entries, storage, KEY);
+    expect(loadHistory(storage, KEY)).toEqual(entries);
   });
 });
 
@@ -99,11 +116,11 @@ describe("appendHistory", () => {
 describe("recordSession", () => {
   it("loads, appends, saves, and returns the updated history in one call", () => {
     const storage = new FakeStorage();
-    saveHistory([entry({ timestamp: 1 })], storage);
+    saveHistory([entry({ timestamp: 1 })], storage, KEY);
 
-    const result = recordSession(entry({ timestamp: 2 }), storage);
+    const result = recordSession(entry({ timestamp: 2 }), storage, KEY);
 
     expect(result.map(e => e.timestamp)).toEqual([2, 1]);
-    expect(loadHistory(storage).map(e => e.timestamp)).toEqual([2, 1]);
+    expect(loadHistory(storage, KEY).map(e => e.timestamp)).toEqual([2, 1]);
   });
 });
