@@ -1,12 +1,18 @@
 import "./styles.css";
 import { LEGACY_PROGRESS_STORAGE_KEY, migrateLegacyStorage, progressStorageKey, type Exercise, type ReadoutCell } from "./exercise";
+import { createMotExercise } from "./exercises/mot";
 import { createCentreEdgeDistractorsExercise, createCentreEdgeExercise, createCentreOnlyExercise } from "./exercises/ufov";
 import { historyStorageKey, LEGACY_HISTORY_STORAGE_KEY, loadHistory, recordSession } from "./history";
 
 type Phase = "ready" | "preparing" | "showing" | "responding" | "paused" | "complete";
 
 /** Every exercise Thoth currently offers. Order here is picker order. */
-const exercises: Exercise[] = [createCentreOnlyExercise(), createCentreEdgeExercise(), createCentreEdgeDistractorsExercise()];
+const exercises: Exercise[] = [
+  createCentreOnlyExercise(),
+  createCentreEdgeExercise(),
+  createCentreEdgeDistractorsExercise(),
+  createMotExercise(),
+];
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root not found.");
@@ -261,6 +267,7 @@ function presentTrial(activeTrial: unknown): void {
       hideStimuli();
       response.reset();
       setPhase("responding");
+      activeExercise.beginResponse?.(activeTrial);
       response.querySelector<HTMLInputElement>("input")?.focus();
     }, activeExercise.flashDurationMs(activeTrial));
   }, 650);

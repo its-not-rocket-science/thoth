@@ -9,13 +9,17 @@ An open-source, browser-based visual processing and divided-attention training g
 
 This repository contains an early playable prototype.
 
-The exercises mirror the three official subtests of the clinical Useful Field of View (UFOV) instrument (see [Useful field of view](#useful-field-of-view) below), each independently scored and progressed:
+The first three exercises mirror the three official subtests of the clinical Useful Field of View (UFOV) instrument (see [Useful field of view](#useful-field-of-view) below), each independently scored and progressed:
 
 1. **Centre only** — briefly identify a central target alone (pure processing speed).
 2. **Centre and edge** — identify the central target while simultaneously localising a target in the peripheral visual field (divided attention).
 3. **Centre and edge, with distractors** — the same divided-attention task with the peripheral target embedded among decoy glyphs (selective attention).
 
-All three continue at an adaptively adjusted level of difficulty. The project is inspired by published research into visual speed-of-processing training and the useful field of view. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
+A fourth exercise draws on a separate paradigm:
+
+4. **Multiple object tracking** — briefly memorise a subset of identical dots as they're highlighted, then track them by eye as every dot drifts around the field, and pick the original targets back out once they stop (see [Multiple object tracking](#multiple-object-tracking) below).
+
+Each continues at an adaptively adjusted level of difficulty. The project is inspired by published research into visual speed-of-processing training, the useful field of view, and multiple object tracking. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
 ## About the name
 
@@ -93,6 +97,12 @@ Background reading:
   https://www.brainhq.com/why-brainhq/about-the-brainhq-exercises/attention/double-decision/
 
 The BrainHQ page is included to document the commercial exercise associated with the ACTIVE research, not as an implementation specification.
+
+### Multiple object tracking
+
+"Multiple object tracking" (Exercise No. 04) is a separate paradigm from UFOV, grounded in the classic sustained divided-attention literature:
+
+- Pylyshyn ZW, Storm RW. **Tracking multiple independent targets: evidence for a parallel tracking mechanism.** *Spatial Vision*. 1988;3(3):179–197.
 
 ## Scientific caution
 

@@ -41,3 +41,29 @@ export interface SessionHistoryEntry {
   accuracyPct: number;
   lowestPresentationMs: number;
 }
+
+/** A single tracked object's kinematic state for the multiple-object-
+ *  tracking exercise: position and velocity in field-relative pixels. */
+export interface MotionState {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+/** The rectangle motion is confined to, plus the tracked object's own
+ *  radius so bounce reflection accounts for its size rather than treating
+ *  it as a point. */
+export interface MotionBounds {
+  width: number;
+  height: number;
+  radius: number;
+}
+
+export interface MotTrial {
+  objectCount: number;
+  /** Indices into `objects` that are the targets to remember; always
+   *  sorted ascending. */
+  targetIndices: number[];
+  objects: MotionState[];
+}

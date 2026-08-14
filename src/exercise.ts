@@ -60,7 +60,18 @@ export interface Exercise<TState = unknown, TTrial = unknown> {
   createTrial(state: TState): TTrial;
   flashDurationMs(trial: TTrial): number;
   showTrial(trial: TTrial): void;
+  /** Called when leaving the "showing" phase, for any reason (the flash's
+   *  natural end, or an interruption — pause, tab hidden, reset): stop any
+   *  pending internal timers/animation and clear the stimulus. Must be
+   *  idempotent and safe to call on an already-interrupted trial. */
   hideTrial(): void;
+  /** Optional: called once, right after entering "responding", once
+   *  hideTrial() has already cleared the flash. Exercises whose response
+   *  is a separate form (the common case) don't need this. Exercises whose
+   *  response *is* interacting with the stimulus itself (e.g. clicking
+   *  objects that were just tracked) use it to reveal the frozen stimulus
+   *  for interaction, from state they retained across hideTrial(). */
+  beginResponse?(trial: TTrial): void;
 
   /** Reads the submitted form; null if the answer is incomplete. */
   readAnswer(response: HTMLFormElement): unknown | null;

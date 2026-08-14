@@ -266,6 +266,27 @@ h2 {
   width: 1em;
   height: 1em;
 }
+/* Multiple object tracking: dots positioned via left/top in field-relative
+   px (computed in mot.ts against .field's own clientWidth/clientHeight),
+   not the percentage/transform approach the other exercises use. */
+.mot-object {
+  position: absolute;
+  z-index: 2;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--paper-dim);
+  transform: translate(-50%, -50%);
+  transition: background-color 150ms ease;
+}
+.mot-object.target-highlight {
+  background: var(--brass-bright);
+  box-shadow: 0 0 10px rgb(226 167 90 / 45%);
+}
+.mot-objects.respond-active .mot-object { cursor: pointer; }
+.mot-object.selected { box-shadow: 0 0 0 2px var(--phosphor); }
+.mot-object.correct-answer { box-shadow: 0 0 0 2px var(--phosphor), 0 0 10px rgb(127 216 166 / 45%); }
+
 /* Idle-state affordance: before the first trial, a soft breathing glow
    behind the fixation cross hints that the field is waiting on input,
    rather than reading as an inert blank grid. Reuses the same translucent

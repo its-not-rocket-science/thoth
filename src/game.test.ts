@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  createMotTrial,
   createTrial,
   DISTRACTOR_STAIRCASE,
   generateDistractors,
   INITIAL_STATE,
+  MOT_OBJECT_COUNT_STAIRCASE,
   PRESENTATION_STAIRCASE,
   scoreTrial,
+  stepMotion,
   stepStaircase,
   summarizeSession,
 } from "./game";
-import type { PeripheralPosition, Trial } from "./types";
+import type { MotionBounds, PeripheralPosition, Trial } from "./types";
 
 const trial: Trial = {
   centralSymbol: "circle",
@@ -228,5 +231,102 @@ describe("scoreTrial with distractors present", () => {
       peripheralPosition: 1,
     });
     expect(next.score).toBe(0);
+  });
+});
+
+describe("stepMotion", () => {
+  const bounds: MotionBounds = { width: 100, height: 100, radius: 5 };
+
+  it("moves in a straight line with no wall in range", () => {
+    const next = stepMotion({ x: 50, y: 50, vx: 10, vy: 5 }, 1, bounds);
+    expect(next).toEqual({ x: 60, y: 55, vx: 10, vy: 5 });
+  });
+
+  it("reflects off the right edge, mirroring the overshoot back inward", () => {
+    const next = stepMotion({ x: 90, y: 50, vx: 20, vy: 0 }, 1, bounds);
+    expect(next).toEqual({ x: 80, y: 50, vx: -20, vy: 0 });
+  });
+
+  it("reflects off the left edge", () => {
+    const next = stepMotion({ x: 10, y: 50, vx: -20, vy: 0 }, 1, bounds);
+    expect(next).toEqual({ x: 20, y: 50, vx: 20, vy: 0 });
+  });
+
+  it("reflects off the bottom edge", () => {
+    const next = stepMotion({ x: 50, y: 90, vx: 0, vy: 20 }, 1, bounds);
+    expect(next).toEqual({ x: 50, y: 80, vx: 0, vy: -20 });
+  });
+
+  it("reflects off the top edge", () => {
+    const next = stepMotion({ x: 50, y: 10, vx: 0, vy: -20 }, 1, bounds);
+    expect(next).toEqual({ x: 50, y: 20, vx: 0, vy: 20 });
+  });
+});
+
+describe("createMotTrial", () => {
+  const bounds: MotionBounds = { width: 400, height: 400, radius: 12 };
+
+  it("creates exactly objectCount objects", () => {
+    const trial = createMotTrial(8, 3, bounds);
+    expect(trial.objects).toHaveLength(8);
+    expect(trial.objectCount).toBe(8);
+  });
+
+  it("picks targetCount distinct target indices within range, sorted ascending", () => {
+    const trial = createMotTrial(8, 3, bounds);
+    expect(trial.targetIndices).toHaveLength(3);
+    expect(new Set(trial.targetIndices).size).toBe(3);
+    trial.targetIndices.forEach(index => {
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(8);
+    });
+    expect([...trial.targetIndices]).toEqual([...trial.targetIndices].sort((a, b) => a - b));
+  });
+
+  it("clamps targetCount to objectCount rather than picking duplicates", () => {
+    const trial = createMotTrial(4, 10, bounds);
+    expect(trial.targetIndices).toHaveLength(4);
+  });
+
+  it("produces no targets when targetCount is 0", () => {
+    const trial = createMotTrial(6, 0, bounds);
+    expect(trial.targetIndices).toEqual([]);
+  });
+
+  it("keeps every object within bounds, accounting for its radius", () => {
+    const trial = createMotTrial(10, 3, bounds);
+    trial.objects.forEach(object => {
+      expect(object.x).toBeGreaterThanOrEqual(bounds.radius);
+      expect(object.x).toBeLessThanOrEqual(bounds.width - bounds.radius);
+      expect(object.y).toBeGreaterThanOrEqual(bounds.radius);
+      expect(object.y).toBeLessThanOrEqual(bounds.height - bounds.radius);
+    });
+  });
+});
+
+describe("MOT_OBJECT_COUNT_STAIRCASE", () => {
+  it("steps object count up by one after two consecutive correct trials", () => {
+    expect(stepStaircase({ value: 6, streak: 1 }, true, MOT_OBJECT_COUNT_STAIRCASE)).toEqual({
+      value: 7,
+      streak: 0,
+    });
+  });
+
+  it("steps object count down by one on a miss", () => {
+    expect(stepStaircase({ value: 6, streak: 1 }, false, MOT_OBJECT_COUNT_STAIRCASE)).toEqual({
+      value: 5,
+      streak: 0,
+    });
+  });
+
+  it("clamps at the configured floor and ceiling", () => {
+    expect(stepStaircase({ value: 5, streak: 0 }, false, MOT_OBJECT_COUNT_STAIRCASE)).toEqual({
+      value: 5,
+      streak: 0,
+    });
+    expect(stepStaircase({ value: 10, streak: 1 }, true, MOT_OBJECT_COUNT_STAIRCASE)).toEqual({
+      value: 10,
+      streak: 0,
+    });
   });
 });

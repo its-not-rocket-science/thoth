@@ -1,5 +1,8 @@
 import type {
   CentralSymbol,
+  MotionBounds,
+  MotionState,
+  MotTrial,
   PeripheralPosition,
   SessionState,
   SessionSummary,
@@ -78,13 +81,21 @@ export const DISTRACTOR_STAIRCASE: StaircaseConfig = {
   easier: value => value - 1,
 };
 
+export const MOT_OBJECT_COUNT_STAIRCASE: StaircaseConfig = {
+  min: 5,
+  max: 10,
+  streakToStep: 2,
+  harder: value => value + 1,
+  easier: value => value - 1,
+};
+
 function randomItem<T>(items: readonly T[]): T {
   const item = items[Math.floor(Math.random() * items.length)];
   if (item === undefined) throw new Error("Cannot select from an empty collection.");
   return item;
 }
 
-function shuffled<T>(items: readonly T[]): T[] {
+export function shuffled<T>(items: readonly T[]): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -139,6 +150,61 @@ export function scoreTrial(
     distractorCount: distractors.value,
     distractorStreak: distractors.streak,
   };
+}
+
+/** Advances one tracked object by `dt` seconds, reflecting its velocity off
+ *  the edges of `bounds` (accounting for the object's own radius) rather
+ *  than letting it leave the field. Pure — takes no DOM, so it can be
+ *  driven by a real requestAnimationFrame loop or ticked directly in
+ *  tests. */
+export function stepMotion(state: MotionState, dt: number, bounds: MotionBounds): MotionState {
+  let x = state.x + state.vx * dt;
+  let y = state.y + state.vy * dt;
+  let vx = state.vx;
+  let vy = state.vy;
+
+  if (x < bounds.radius) {
+    x = bounds.radius + (bounds.radius - x);
+    vx = -vx;
+  } else if (x > bounds.width - bounds.radius) {
+    x = bounds.width - bounds.radius - (x - (bounds.width - bounds.radius));
+    vx = -vx;
+  }
+
+  if (y < bounds.radius) {
+    y = bounds.radius + (bounds.radius - y);
+    vy = -vy;
+  } else if (y > bounds.height - bounds.radius) {
+    y = bounds.height - bounds.radius - (y - (bounds.height - bounds.radius));
+    vy = -vy;
+  }
+
+  return { x, y, vx, vy };
+}
+
+/** Generates a fresh multiple-object-tracking trial: `objectCount` objects
+ *  at random non-overlapping-by-construction* positions with randomized
+ *  headings at a fixed `speed`, `targetCount` of them (clamped to
+ *  objectCount) chosen as the set to remember. (*Positions are independent
+ *  random draws, not collision-checked — a rare visual overlap at trial
+ *  start doesn't affect scoring, which only cares about the target index
+ *  set, not object identity by position.) */
+export function createMotTrial(
+  objectCount: number,
+  targetCount: number,
+  bounds: MotionBounds,
+  speed = 70,
+): MotTrial {
+  const objects: MotionState[] = Array.from({ length: objectCount }, () => {
+    const x = bounds.radius + Math.random() * (bounds.width - 2 * bounds.radius);
+    const y = bounds.radius + Math.random() * (bounds.height - 2 * bounds.radius);
+    const angle = Math.random() * 2 * Math.PI;
+    return { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+  });
+  const targetIndices = shuffled([...objects.keys()])
+    .slice(0, Math.max(0, Math.min(targetCount, objectCount)))
+    .sort((a, b) => a - b);
+  return { objectCount, targetIndices, objects };
 }
 
 /** lowestPresentationMs is tracked by the caller across a session, since
