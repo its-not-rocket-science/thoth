@@ -341,6 +341,33 @@ h2 {
 .search-item.color-phosphor { color: var(--phosphor); background: var(--phosphor); }
 .search-item.correct-answer { box-shadow: 0 0 0 3px var(--phosphor), 0 0 10px rgb(127 216 166 / 45%); }
 
+/* Task switching: nodes positioned via left/top in field-relative px, same
+   approach as MOT/visual-search. The connecting trail is drawn as SVG
+   lines sized to match those same px coordinates 1:1. */
+.trail-lines { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.trail-line { stroke: var(--phosphor); stroke-width: 2; opacity: 0.7; }
+.trail-nodes { position: absolute; inset: 0; }
+.trail-node {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  background: var(--panel-raised);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.trail-node.visited { border-color: var(--phosphor); background: var(--panel-sunken); color: var(--phosphor); }
+.trail-node.error-flash { border-color: var(--alert); background: var(--alert); color: var(--brass-ink); }
+
 /* Idle-state affordance: before the first trial, a soft breathing glow
    behind the fixation cross hints that the field is waiting on input,
    rather than reading as an inert blank grid. Reuses the same translucent

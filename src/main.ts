@@ -2,6 +2,7 @@ import "./styles.css";
 import { LEGACY_PROGRESS_STORAGE_KEY, migrateLegacyStorage, progressStorageKey, type Exercise, type ReadoutCell } from "./exercise";
 import { createMotExercise } from "./exercises/mot";
 import { createSpatialCueingExercise } from "./exercises/spatial-cueing";
+import { createTaskSwitchingExercise } from "./exercises/task-switching";
 import { createCentreEdgeDistractorsExercise, createCentreEdgeExercise, createCentreOnlyExercise } from "./exercises/ufov";
 import { createVisualSearchExercise } from "./exercises/visual-search";
 import { historyStorageKey, LEGACY_HISTORY_STORAGE_KEY, loadHistory, recordSession } from "./history";
@@ -16,6 +17,7 @@ const exercises: Exercise[] = [
   createMotExercise(),
   createSpatialCueingExercise(),
   createVisualSearchExercise(),
+  createTaskSwitchingExercise(),
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");

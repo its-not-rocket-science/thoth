@@ -15,13 +15,14 @@ The first three exercises mirror the three official subtests of the clinical Use
 2. **Centre and edge** — identify the central target while simultaneously localising a target in the peripheral visual field (divided attention).
 3. **Centre and edge, with distractors** — the same divided-attention task with the peripheral target embedded among decoy glyphs (selective attention).
 
-Three further exercises draw on separate paradigms:
+Four further exercises draw on separate paradigms:
 
 4. **Multiple object tracking** — briefly memorise a subset of identical dots as they're highlighted, then track them by eye as every dot drifts around the field, and pick the original targets back out once they stop (see [Multiple object tracking](#multiple-object-tracking) below).
 5. **Spatial cueing** — respond the instant a target appears at one of eight positions, usually (but not always) where a brief cue just brightened; measures raw reaction time and the cost of a misleading cue, not accuracy (see [Spatial cueing](#spatial-cueing) below).
 6. **Visual search** — find one target shape among a grid of distractors as fast as possible; measures how reaction time scales with the number of distractors, not raw speed (see [Visual search](#visual-search) below).
+7. **Task switching** — connect alternating numbered and lettered nodes (1-A-2-B-3-C…) in order as fast as possible; a Trail-Making-Test-style paradigm scored on completion time and error count, structured as a handful of complete-the-trail rounds rather than short flash trials (see [Task switching](#task-switching) below).
 
-Exercises 1–4 continue at an adaptively adjusted level of difficulty (visual search adapts set size the same way); spatial cueing measures reaction time directly instead and doesn't use a difficulty staircase (see its section below for why). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, spatial attention, and visual search. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
+Exercises 1–4 and 6 continue at an adaptively adjusted level of difficulty; spatial cueing and task switching measure time/errors directly instead and don't use a difficulty staircase (see their sections below for why). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, spatial attention, visual search, and task switching. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
 ## About the name
 
@@ -117,6 +118,12 @@ The BrainHQ page is included to document the commercial exercise associated with
 "Visual search" (Exercise No. 06) is a distinct construct from every exercise above: the efficiency of finding one item among many, as a function of how many distractors surround it — measured as the slope of reaction time against set size, not accuracy or raw speed:
 
 - Treisman AM, Gelade G. **A feature-integration theory of attention.** *Cognitive Psychology*. 1980;12(1):97–136.
+
+### Task switching
+
+"Task switching" (Exercise No. 07) is not a UFOV subtest, but Trail Making Test B is one of the standard secondary outcome measures used alongside UFOV in the same speed-of-processing trial literature this project already cites above (ACTIVE). Connect alternating numbered and lettered nodes (1-A-2-B-3-C…) in order; completion time and error count are both scored, since switching cost and error rate are the two standard outcome measures for this paradigm. Halved to 6 numbers + 6 letters (12 nodes) from the real test's 13+12, and structured as a handful of complete-the-trail rounds per session rather than 20 short flash trials, since a single round already takes as long as several of the app's other trials combined:
+
+- Reitan RM. **Validity of the Trail Making Test as an indicator of organic brain damage.** *Perceptual and Motor Skills*. 1958;8(3):271–276.
 
 ## Scientific caution
 
