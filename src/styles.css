@@ -287,6 +287,41 @@ h2 {
 .mot-object.selected { box-shadow: 0 0 0 2px var(--phosphor); }
 .mot-object.correct-answer { box-shadow: 0 0 0 2px var(--phosphor), 0 0 10px rgb(127 216 166 / 45%); }
 
+/* Spatial cueing: one marker element reused for both the brief cue and the
+   target, repositioned via the same compass-angle transform peripheral
+   stimuli already use elsewhere. */
+.cueing-marker { position: absolute; top: 50%; left: 50%; z-index: 2; border-radius: 50%; }
+.cueing-marker.cue {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0.15rem solid var(--brass);
+  background: transparent;
+}
+.cueing-marker.target {
+  width: 1.9rem;
+  height: 1.9rem;
+  background: var(--phosphor);
+  filter: drop-shadow(0 0 10px rgb(127 216 166 / 55%));
+}
+.cueing-respond-button {
+  position: absolute;
+  bottom: 3.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.4rem;
+  border: 1px solid var(--brass);
+  border-radius: 0.4rem;
+  background: var(--brass-bright);
+  color: var(--brass-ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.cueing-respond-button:hover { background: var(--brass); }
+.cueing-respond-button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
+
 /* Idle-state affordance: before the first trial, a soft breathing glow
    behind the fixation cross hints that the field is waiting on input,
    rather than reading as an inert blank grid. Reuses the same translucent

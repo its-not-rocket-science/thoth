@@ -1,6 +1,7 @@
 import "./styles.css";
 import { LEGACY_PROGRESS_STORAGE_KEY, migrateLegacyStorage, progressStorageKey, type Exercise, type ReadoutCell } from "./exercise";
 import { createMotExercise } from "./exercises/mot";
+import { createSpatialCueingExercise } from "./exercises/spatial-cueing";
 import { createCentreEdgeDistractorsExercise, createCentreEdgeExercise, createCentreOnlyExercise } from "./exercises/ufov";
 import { historyStorageKey, LEGACY_HISTORY_STORAGE_KEY, loadHistory, recordSession } from "./history";
 
@@ -12,6 +13,7 @@ const exercises: Exercise[] = [
   createCentreEdgeExercise(),
   createCentreEdgeDistractorsExercise(),
   createMotExercise(),
+  createSpatialCueingExercise(),
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -359,7 +361,17 @@ exerciseCards.addEventListener("click", event => {
 
 response.addEventListener("submit", event => {
   event.preventDefault();
-  if (phase !== "responding" || !trial) return;
+  // Normally only "responding" can submit. Reaction-time exercises (see
+  // spatial-cueing.ts) capture the response the instant their own stimulus
+  // appears — mid-"showing" — and call answerControls.form.requestSubmit()
+  // themselves rather than waiting for the host's flash timer; cancel that
+  // pending timer and clear the stimulus ourselves in that case, since the
+  // normal path (in presentTrial, below) won't run to do it.
+  if (!(phase === "responding" || phase === "showing") || !trial) return;
+  if (phase === "showing") {
+    clearTimers();
+    hideStimuli();
+  }
 
   const answer = activeExercise.readAnswer(response);
   if (answer === null) {

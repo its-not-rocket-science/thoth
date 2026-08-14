@@ -15,11 +15,12 @@ The first three exercises mirror the three official subtests of the clinical Use
 2. **Centre and edge** — identify the central target while simultaneously localising a target in the peripheral visual field (divided attention).
 3. **Centre and edge, with distractors** — the same divided-attention task with the peripheral target embedded among decoy glyphs (selective attention).
 
-A fourth exercise draws on a separate paradigm:
+Two further exercises draw on separate paradigms:
 
 4. **Multiple object tracking** — briefly memorise a subset of identical dots as they're highlighted, then track them by eye as every dot drifts around the field, and pick the original targets back out once they stop (see [Multiple object tracking](#multiple-object-tracking) below).
+5. **Spatial cueing** — respond the instant a target appears at one of eight positions, usually (but not always) where a brief cue just brightened; measures raw reaction time and the cost of a misleading cue, not accuracy (see [Spatial cueing](#spatial-cueing) below).
 
-Each continues at an adaptively adjusted level of difficulty. The project is inspired by published research into visual speed-of-processing training, the useful field of view, and multiple object tracking. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
+Exercises 1–4 continue at an adaptively adjusted level of difficulty; spatial cueing measures reaction time directly instead and doesn't use a difficulty staircase (see its section below for why). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, and spatial attention. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
 ## About the name
 
@@ -103,6 +104,12 @@ The BrainHQ page is included to document the commercial exercise associated with
 "Multiple object tracking" (Exercise No. 04) is a separate paradigm from UFOV, grounded in the classic sustained divided-attention literature:
 
 - Pylyshyn ZW, Storm RW. **Tracking multiple independent targets: evidence for a parallel tracking mechanism.** *Spatial Vision*. 1988;3(3):179–197.
+
+### Spatial cueing
+
+"Spatial cueing" (Exercise No. 05) is a reaction-time paradigm for attentional orienting, not a UFOV subtest — it measures raw response speed and the cost of an invalid cue, not accuracy at a given presentation duration:
+
+- Posner MI. **Orienting of attention.** *Quarterly Journal of Experimental Psychology*. 1980;32(1):3–25.
 
 ## Scientific caution
 
