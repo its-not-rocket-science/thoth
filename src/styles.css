@@ -322,6 +322,25 @@ h2 {
 .cueing-respond-button:hover { background: var(--brass); }
 .cueing-respond-button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
 
+/* Visual search: items are positioned via left/top in field-relative px
+   (grid cells computed against .field's own clientWidth/clientHeight in
+   visual-search.ts), same approach as the MOT dots. */
+.search-grid { position: absolute; inset: 0; }
+.search-item {
+  position: absolute;
+  z-index: 2;
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 0.19rem solid currentColor;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+.search-item.circle { border-radius: 50%; }
+.search-item.diamond { transform: translate(-50%, -50%) rotate(45deg); }
+.search-item.color-brass { color: var(--brass-bright); background: var(--brass-bright); }
+.search-item.color-phosphor { color: var(--phosphor); background: var(--phosphor); }
+.search-item.correct-answer { box-shadow: 0 0 0 3px var(--phosphor), 0 0 10px rgb(127 216 166 / 45%); }
+
 /* Idle-state affordance: before the first trial, a soft breathing glow
    behind the fixation cross hints that the field is waiting on input,
    rather than reading as an inert blank grid. Reuses the same translucent

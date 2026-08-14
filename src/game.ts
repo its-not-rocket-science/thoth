@@ -89,6 +89,14 @@ export const MOT_OBJECT_COUNT_STAIRCASE: StaircaseConfig = {
   easier: value => value - 1,
 };
 
+export const SEARCH_SET_SIZE_STAIRCASE: StaircaseConfig = {
+  min: 4,
+  max: 20,
+  streakToStep: 2,
+  harder: value => value + 2,
+  easier: value => value - 2,
+};
+
 function randomItem<T>(items: readonly T[]): T {
   const item = items[Math.floor(Math.random() * items.length)];
   if (item === undefined) throw new Error("Cannot select from an empty collection.");

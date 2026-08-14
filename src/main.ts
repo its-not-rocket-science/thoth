@@ -3,6 +3,7 @@ import { LEGACY_PROGRESS_STORAGE_KEY, migrateLegacyStorage, progressStorageKey, 
 import { createMotExercise } from "./exercises/mot";
 import { createSpatialCueingExercise } from "./exercises/spatial-cueing";
 import { createCentreEdgeDistractorsExercise, createCentreEdgeExercise, createCentreOnlyExercise } from "./exercises/ufov";
+import { createVisualSearchExercise } from "./exercises/visual-search";
 import { historyStorageKey, LEGACY_HISTORY_STORAGE_KEY, loadHistory, recordSession } from "./history";
 
 type Phase = "ready" | "preparing" | "showing" | "responding" | "paused" | "complete";
@@ -14,6 +15,7 @@ const exercises: Exercise[] = [
   createCentreEdgeDistractorsExercise(),
   createMotExercise(),
   createSpatialCueingExercise(),
+  createVisualSearchExercise(),
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");
