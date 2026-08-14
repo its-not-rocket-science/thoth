@@ -97,6 +97,16 @@ export const SEARCH_SET_SIZE_STAIRCASE: StaircaseConfig = {
   easier: value => value - 2,
 };
 
+/** Steps the go/no-go stream's inter-stimulus interval — shorter is
+ *  harder (less time to notice and decide). */
+export const CPT_ISI_STAIRCASE: StaircaseConfig = {
+  min: 500,
+  max: 1500,
+  streakToStep: 2,
+  harder: value => value * 0.85,
+  easier: value => value * 1.2,
+};
+
 function randomItem<T>(items: readonly T[]): T {
   const item = items[Math.floor(Math.random() * items.length)];
   if (item === undefined) throw new Error("Cannot select from an empty collection.");

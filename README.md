@@ -21,6 +21,7 @@ Four further exercises draw on separate paradigms:
 5. **Spatial cueing** — respond the instant a target appears at one of eight positions, usually (but not always) where a brief cue just brightened; measures raw reaction time and the cost of a misleading cue, not accuracy (see [Spatial cueing](#spatial-cueing) below).
 6. **Visual search** — find one target shape among a grid of distractors as fast as possible; measures how reaction time scales with the number of distractors, not raw speed (see [Visual search](#visual-search) below).
 7. **Task switching** — connect alternating numbered and lettered nodes (1-A-2-B-3-C…) in order as fast as possible; a Trail-Making-Test-style paradigm scored on completion time and error count, structured as a handful of complete-the-trail rounds rather than short flash trials (see [Task switching](#task-switching) below).
+8. **Sustained attention** — respond to a rapid ~65-second stream of central glyphs, pressing for the frequent "go" shape and withholding for the rare "no-go" shape; a continuous performance test (CPT) paradigm scored on commission errors, omission errors, and mean reaction time, not accuracy at a single presentation (see [Sustained attention](#sustained-attention) below).
 
 Exercises 1–4 and 6 continue at an adaptively adjusted level of difficulty; spatial cueing and task switching measure time/errors directly instead and don't use a difficulty staircase (see their sections below for why). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, spatial attention, visual search, and task switching. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
@@ -124,6 +125,12 @@ The BrainHQ page is included to document the commercial exercise associated with
 "Task switching" (Exercise No. 07) is not a UFOV subtest, but Trail Making Test B is one of the standard secondary outcome measures used alongside UFOV in the same speed-of-processing trial literature this project already cites above (ACTIVE). Connect alternating numbered and lettered nodes (1-A-2-B-3-C…) in order; completion time and error count are both scored, since switching cost and error rate are the two standard outcome measures for this paradigm. Halved to 6 numbers + 6 letters (12 nodes) from the real test's 13+12, and structured as a handful of complete-the-trail rounds per session rather than 20 short flash trials, since a single round already takes as long as several of the app's other trials combined:
 
 - Reitan RM. **Validity of the Trail Making Test as an indicator of organic brain damage.** *Perceptual and Motor Skills*. 1958;8(3):271–276.
+
+### Sustained attention
+
+"Sustained attention" (Exercise No. 08) is grounded in the continuous performance test (CPT) literature, and is the app's only exercise built around vigilance over an extended period rather than a single brief presentation. A rapid stream of circles ("go") and rare diamonds ("no-go", ~15% of events) passes the centre of the field for about a minute; the player responds to every circle and withholds on every diamond. Scored on commission errors (responding to a no-go), omission errors (missing a go), and mean reaction time on correct go trials — inter-stimulus interval adapts via the same 2-down-1-up staircase used elsewhere, shortening as the player keeps pace and lengthening after a lapse:
+
+- Rosvold HE, Mirsky AF, Sarason I, Bransome ED Jr, Beck LH. **A continuous performance test of brain damage.** *Journal of Consulting Psychology*. 1956;20(5):343–350.
 
 ## Scientific caution
 

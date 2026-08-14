@@ -322,6 +322,37 @@ h2 {
 .cueing-respond-button:hover { background: var(--brass); }
 .cueing-respond-button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
 
+/* Sustained attention: the 20-trial progress bar doesn't mean anything for
+   a single continuous stream, so this exercise gets its own visible
+   countdown instead. */
+.cpt-timer {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  height: 0.3rem;
+  border-radius: 0.15rem;
+  background: var(--panel-sunken);
+  overflow: hidden;
+  z-index: 2;
+}
+.cpt-timer-fill {
+  height: 100%;
+  background: var(--brass-bright);
+  transition: width 250ms linear;
+}
+.cpt-timer-label {
+  position: absolute;
+  top: 1.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
 /* Visual search: items are positioned via left/top in field-relative px
    (grid cells computed against .field's own clientWidth/clientHeight in
    visual-search.ts), same approach as the MOT dots. */
