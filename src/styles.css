@@ -113,6 +113,7 @@ h2 {
 /* Exercise picker                                                        */
 /* ---------------------------------------------------------------------- */
 .exercise-picker { margin-bottom: 1.25rem; }
+.picker-header { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
 .exercise-cards { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .exercise-card {
   display: flex;
@@ -131,8 +132,55 @@ h2 {
 .exercise-card:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
 .exercise-card.active { border-color: var(--brass); background: var(--panel-raised); box-shadow: inset 0 0 0 1px var(--brass); }
 .exercise-card .eyebrow { margin-bottom: 0; }
+.exercise-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
 .exercise-card-name { color: var(--paper); font-family: var(--font-display); font-size: 1.02rem; font-weight: 500; }
 .exercise-card-summary { color: var(--paper-faint); font-family: var(--font-mono); font-size: 0.72rem; }
+
+/* Exercise classification badge (training / measurement / mixed) — see
+   README's "Exercise classification" section for what each label means. */
+.mode-badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  color: var(--paper-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mode-badge.mode-training { border-color: var(--brass); color: var(--brass-bright); }
+.mode-badge.mode-measurement { border-color: var(--phosphor); color: var(--phosphor); }
+.mode-badge.mode-mixed { border-color: var(--paper-dim); color: var(--paper-dim); }
+
+/* Recommended-session panel */
+.recommended-panel {
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--brass);
+  border-radius: 0.5rem;
+  background: var(--panel);
+}
+.recommended-caution { margin: 0.2rem 0 0.75rem; color: var(--paper-faint); font-size: 0.8rem; }
+.recommended-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.recommended-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.4rem;
+  background: var(--panel-sunken);
+}
+.recommended-row .eyebrow { margin-bottom: 0.1rem; }
+.recommended-name { display: block; color: var(--paper); font-family: var(--font-display); font-size: 0.98rem; font-weight: 500; }
+.recommended-minutes { display: block; color: var(--paper-faint); font-family: var(--font-mono); font-size: 0.7rem; }
+.recommended-actions { display: flex; gap: 0.35rem; }
+.recommended-actions button { min-height: 2.1rem; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
 
 /* ---------------------------------------------------------------------- */
 /* Game card                                                              */
@@ -155,6 +203,27 @@ h2 {
 .vision-note { margin: 0.4rem 0 0; color: var(--paper-faint); font-size: 0.82rem; }
 .instructions { max-width: 60rem; margin: 0.9rem 0 1.1rem; color: var(--paper-dim); line-height: 1.55; }
 .instructions strong { color: var(--paper); font-weight: 600; }
+
+.practice-hint {
+  max-width: 60rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--hairline);
+  border-radius: 0.4rem;
+  color: var(--paper-dim);
+  font-size: 0.82rem;
+}
+.practice-banner {
+  max-width: 60rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--brass);
+  border-radius: 0.4rem;
+  background: var(--brass-ink);
+  color: var(--brass-bright);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
 
 .progress-track {
   overflow: hidden;
@@ -224,7 +293,7 @@ h2 {
     linear-gradient(var(--hairline-soft) 1px, transparent 1px),
     linear-gradient(90deg, var(--hairline-soft) 1px, transparent 1px),
     var(--panel-sunken);
-  background-size: 44px 44px;
+  background-size: 2.75rem 2.75rem;
 }
 .fixation, .central, .peripheral { position: absolute; top: 50%; left: 50%; }
 .fixation {
@@ -303,24 +372,6 @@ h2 {
   background: var(--phosphor);
   filter: drop-shadow(0 0 10px rgb(127 216 166 / 55%));
 }
-.cueing-respond-button {
-  position: absolute;
-  bottom: 3.4rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.6rem 1.4rem;
-  border: 1px solid var(--brass);
-  border-radius: 0.4rem;
-  background: var(--brass-bright);
-  color: var(--brass-ink);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.cueing-respond-button:hover { background: var(--brass); }
-.cueing-respond-button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
 
 /* Sustained attention: the 20-trial progress bar doesn't mean anything for
    a single continuous stream, so this exercise gets its own visible
@@ -596,6 +647,7 @@ legend {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.4rem 0.7rem;
   background: var(--panel-sunken);
@@ -603,11 +655,45 @@ legend {
   font-size: 0.78rem;
 }
 .history-date { color: var(--paper-faint); }
-.history-accuracy { color: var(--paper); font-weight: 500; }
-.history-interval { color: var(--paper-dim); font-variant-numeric: tabular-nums; }
-.history-interval .unit { margin-left: 0.1rem; color: var(--paper-faint); font-size: 0.85em; }
+.history-metric { display: inline-flex; align-items: baseline; gap: 0.3rem; color: var(--paper); font-weight: 500; }
+.history-metric-label { color: var(--paper-faint); font-size: 0.85em; font-weight: 400; }
+.history-metric .unit { margin-left: 0.1rem; color: var(--paper-faint); font-size: 0.85em; }
+
+/* ---------------------------------------------------------------------- */
+/* Progress tracker                                                       */
+/* ---------------------------------------------------------------------- */
+.progress-panel {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.5rem;
+  background: var(--panel-sunken);
+}
+.progress-panel .eyebrow { margin-bottom: 0.5rem; }
+.sparkline { display: block; width: 100%; height: 3.5rem; margin-bottom: 0.6rem; }
+.sparkline polyline { fill: none; stroke: var(--phosphor); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.progress-list { display: flex; flex-direction: column; gap: 1px; margin: 0 0 0.6rem; padding: 0; list-style: none; }
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--panel);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+.progress-date { color: var(--paper-faint); }
+.progress-value { color: var(--paper); font-weight: 500; font-variant-numeric: tabular-nums; }
+.progress-trend { width: 1.2em; text-align: center; }
+.progress-trend.trend-up { color: var(--phosphor); }
+.progress-trend.trend-down { color: var(--alert); }
+.progress-trend.trend-flat, .progress-trend.trend-unknown { color: var(--paper-faint); }
+.progress-caution { margin: 0.4rem 0 0; color: var(--paper-faint); font-size: 0.76rem; line-height: 1.5; }
 
 footer { padding-top: 1.5rem; color: var(--paper-faint); font-size: 0.82rem; text-align: center; }
+footer p { margin: 0 0 0.6rem; }
+#export-diagnostics { min-height: 2.1rem; padding: 0.4rem 0.8rem; font-size: 0.7rem; }
 
 /* ---------------------------------------------------------------------- */
 /* Motion                                                                 */

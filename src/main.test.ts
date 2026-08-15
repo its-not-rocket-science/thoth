@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const LEGACY_PROGRESS_KEY = "thoth-progress-v1";
 const CENTRE_EDGE_PROGRESS_KEY = "thoth-progress-centre-edge-v1";
+const CENTRE_EDGE_HISTORY_KEY = "thoth-history-centre-edge-v1";
 const LEGACY_HISTORY_KEY = "thoth-history-v1";
 const SESSION_LENGTH = 20;
 
@@ -192,6 +193,78 @@ describe("pause during the flash", () => {
     expect(document.querySelector("#feedback")?.textContent).toMatch(/discarded/);
     expect(document.querySelector("#field-message")?.textContent).toBe("Paused");
     expect(document.querySelector<HTMLFieldSetElement>("#answer-controls")?.disabled).toBe(true);
+  });
+
+  it("records the interrupted presentation as an invalid timing diagnostic", async () => {
+    mockDeterministicTrial();
+    await loadApp();
+    selectCentreAndEdge();
+
+    screen.getByRole("button", { name: "Start trial" }).click();
+    await vi.advanceTimersByTimeAsync(700);
+    screen.getByRole("button", { name: "Pause" }).click();
+
+    const raw = localStorage.getItem("thoth-timing-diagnostics-v1");
+    expect(raw).not.toBeNull();
+    const records = JSON.parse(raw as string) as Array<{ valid: boolean; invalidReason: string | null }>;
+    expect(records[0]?.valid).toBe(false);
+    expect(records[0]?.invalidReason).toBe("paused");
+  });
+});
+
+describe("exercise picker", () => {
+  it("shows a mode badge on every exercise card", async () => {
+    await loadApp();
+    const badges = document.querySelectorAll("#exercise-cards .mode-badge");
+    expect(badges.length).toBeGreaterThan(0);
+    badges.forEach(badge => {
+      expect(["Training", "Measurement", "Mixed"]).toContain(badge.textContent);
+    });
+  });
+});
+
+describe("practice mode", () => {
+  it("does not touch saved progress, saved history, or the session-complete state", async () => {
+    mockDeterministicTrial();
+    await loadApp();
+    selectCentreAndEdge();
+
+    // One real, scored trial first, so there's saved progress to protect.
+    screen.getByRole("button", { name: "Start trial" }).click();
+    await advanceThroughFlash();
+    submitAnswer("circle", 0);
+    expect(readoutValue("#readouts", "Correct")).toBe("1");
+    const savedBefore = localStorage.getItem(CENTRE_EDGE_PROGRESS_KEY);
+    expect(savedBefore).not.toBeNull();
+
+    // Enter practice and run one (incorrect) practice trial.
+    screen.getByRole("button", { name: "Practise" }).click();
+    expect(screen.getByRole("button", { name: "End practice" })).toBeTruthy();
+
+    // Practice eases centre-edge to the slowest presentation interval
+    // (1500ms — see ufov.ts's practiceState), not the scored default.
+    screen.getByRole("button", { name: "Start trial" }).click();
+    await advanceThroughFlash(1500);
+    submitAnswer("diamond", 5);
+
+    // Real saved progress must be byte-for-byte unchanged by the practice trial.
+    expect(localStorage.getItem(CENTRE_EDGE_PROGRESS_KEY)).toBe(savedBefore);
+    expect(localStorage.getItem(CENTRE_EDGE_HISTORY_KEY)).toBeNull();
+
+    // Leaving practice restores the real (unaffected) saved progress.
+    screen.getByRole("button", { name: "End practice" }).click();
+    expect(readoutValue("#readouts", "Correct")).toBe("1");
+  });
+});
+
+describe("recommended session", () => {
+  it("opens a panel offering exercises to start, and remembers the picks", async () => {
+    await loadApp();
+    screen.getByRole("button", { name: "Recommended session" }).click();
+
+    const startButtons = document.querySelectorAll("[data-recommended-start]");
+    expect(startButtons.length).toBeGreaterThan(0);
+    expect(localStorage.getItem("thoth-recommended-last-v1")).not.toBeNull();
   });
 });
 

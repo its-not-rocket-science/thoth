@@ -1,5 +1,12 @@
 import "./styles.css";
-import { LEGACY_PROGRESS_STORAGE_KEY, migrateLegacyStorage, progressStorageKey, type Exercise, type ReadoutCell } from "./exercise";
+import {
+  LEGACY_PROGRESS_STORAGE_KEY,
+  migrateLegacyStorage,
+  progressStorageKey,
+  type Exercise,
+  type ReadoutCell,
+  type RecommendedCategory,
+} from "./exercise";
 import { createMotExercise } from "./exercises/mot";
 import { createSpatialCueingExercise } from "./exercises/spatial-cueing";
 import { createSustainedAttentionExercise } from "./exercises/sustained-attention";
@@ -7,6 +14,9 @@ import { createTaskSwitchingExercise } from "./exercises/task-switching";
 import { createCentreEdgeDistractorsExercise, createCentreEdgeExercise, createCentreOnlyExercise } from "./exercises/ufov";
 import { createVisualSearchExercise } from "./exercises/visual-search";
 import { historyStorageKey, LEGACY_HISTORY_STORAGE_KEY, loadHistory, recordSession } from "./history";
+import { sparklinePoints, trend, trendSymbol } from "./progress";
+import { chooseRecommendedSession, replacePick, type RecommendedPick } from "./recommended";
+import { appendTimingRecord, loadTimingRecords, saveTimingRecords, type TimingRecord } from "./timing";
 
 type Phase = "ready" | "preparing" | "showing" | "responding" | "paused" | "complete";
 
@@ -21,6 +31,14 @@ const exercises: Exercise[] = [
   createTaskSwitchingExercise(),
   createSustainedAttentionExercise(),
 ];
+
+const RECOMMENDED_LAST_KEY = "thoth-recommended-last-v1";
+const MODE_LABEL: Record<Exercise["mode"], string> = { training: "Training", measurement: "Measurement", mixed: "Mixed" };
+const CATEGORY_LABEL: Record<RecommendedCategory, string> = {
+  ufov: "UFOV",
+  "orienting-search": "Orienting / search",
+  executive: "Executive / sustained",
+};
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root not found.");
@@ -44,6 +62,10 @@ app.innerHTML = `
     <aside class="notice"><strong>Research prototype —</strong> not a medical device and not shown to prevent or treat dementia.</aside>
 
     <section class="exercise-picker" aria-label="Choose an exercise">
+      <div class="picker-header">
+        <button id="recommended-toggle" class="secondary" type="button">Recommended session</button>
+      </div>
+      <div id="recommended-panel" class="recommended-panel" hidden></div>
       <div class="exercise-cards" id="exercise-cards"></div>
     </section>
 
@@ -63,6 +85,8 @@ app.innerHTML = `
       </div>
 
       <p class="instructions" id="instructions"></p>
+      <p id="practice-hint" class="practice-hint" hidden></p>
+      <p id="practice-banner" class="practice-banner" hidden></p>
 
       <dl class="readouts" id="readouts" aria-live="polite"></dl>
 
@@ -77,9 +101,13 @@ app.innerHTML = `
           <div class="action-bar" aria-label="Game controls">
             <button id="start" class="primary" type="button">Start trial</button>
             <button id="replay" class="secondary" type="button" disabled>Replay flash</button>
+            <button id="practise" class="secondary" type="button">Practise</button>
             <button id="pause" class="secondary" type="button">Pause</button>
+            <button id="progress-toggle" class="quiet" type="button">Progress</button>
             <button id="reset" class="quiet" type="button">Reset progress</button>
           </div>
+
+          <section id="progress-panel" class="progress-panel" hidden aria-label="Progress over recent sessions"></section>
         </div>
 
         <form id="response" class="response-panel">
@@ -96,7 +124,10 @@ app.innerHTML = `
       <p id="feedback" class="feedback" aria-live="assertive"></p>
     </section>
 
-    <footer>Progress is saved in this browser using web storage. No analytics or account required.</footer>
+    <footer>
+      <p>Progress is saved in this browser using web storage. No analytics or account required.</p>
+      <button id="export-diagnostics" class="quiet" type="button">Download session timing diagnostics (JSON)</button>
+    </footer>
   </main>
 `;
 
@@ -107,9 +138,13 @@ function find<T extends Element>(selector: string): T {
 }
 
 const exerciseCards = find<HTMLDivElement>("#exercise-cards");
+const recommendedToggle = find<HTMLButtonElement>("#recommended-toggle");
+const recommendedPanel = find<HTMLDivElement>("#recommended-panel");
 const exerciseEyebrow = find<HTMLElement>("#exercise-eyebrow");
 const gameHeading = find<HTMLHeadingElement>("#game-heading");
 const instructions = find<HTMLParagraphElement>("#instructions");
+const practiceHint = find<HTMLParagraphElement>("#practice-hint");
+const practiceBanner = find<HTMLParagraphElement>("#practice-banner");
 const readouts = find<HTMLDListElement>("#readouts");
 const summaryPanel = find<HTMLElement>("#summary");
 const summaryReadouts = find<HTMLDListElement>("#summary-readouts");
@@ -121,12 +156,16 @@ const response = find<HTMLFormElement>("#response");
 const answerControls = find<HTMLFieldSetElement>("#answer-controls");
 const start = find<HTMLButtonElement>("#start");
 const replay = find<HTMLButtonElement>("#replay");
+const practise = find<HTMLButtonElement>("#practise");
 const pause = find<HTMLButtonElement>("#pause");
+const progressToggle = find<HTMLButtonElement>("#progress-toggle");
+const progressPanel = find<HTMLElement>("#progress-panel");
 const reset = find<HTMLButtonElement>("#reset");
 const feedback = find<HTMLParagraphElement>("#feedback");
 const progressText = find<HTMLElement>("#progress-text");
 const progressTrack = find<HTMLDivElement>(".progress-track");
 const progressFill = find<HTMLDivElement>("#progress-fill");
+const exportDiagnostics = find<HTMLButtonElement>("#export-diagnostics");
 
 // Pre-multi-exercise saves were unnamespaced; every one of them was always
 // "centre-edge" progress, since that was the only exercise that existed.
@@ -150,11 +189,48 @@ function saveExerciseState(exercise: Exercise, state: unknown): void {
   localStorage.setItem(progressStorageKey(exercise.id), JSON.stringify(state));
 }
 
+function practicedFlagKey(exerciseId: string): string {
+  return `thoth-practiced-${exerciseId}-v1`;
+}
+
+function formatMetricValue(value: unknown, unit?: string): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number") {
+    const rounded = Number.isInteger(value) ? String(value) : value.toFixed(1);
+    return unit ? `${rounded}<span class="unit">${unit}</span>` : rounded;
+  }
+  return String(value);
+}
+
 let activeExercise: Exercise = exercises[0] as Exercise;
 let state: unknown = null;
 let trial: unknown = null;
 let phase: Phase = "ready";
 let timers: number[] = [];
+let practiceMode = false;
+let recommendedPicks: RecommendedPick[] | null = null;
+
+// --- Timing diagnostics (observed vs requested presentation duration) ---
+// See timing.ts for the record shape and README's "Timing diagnostics"
+// section for what this can and can't claim about precision.
+let timingRecords: TimingRecord[] = loadTimingRecords(localStorage);
+let pendingTiming: { exerciseId: string; requestedMs: number; shownAt: number } | null = null;
+
+function finalizeTiming(valid: boolean, invalidReason: string | null): void {
+  if (!pendingTiming) return;
+  const observedMs = performance.now() - pendingTiming.shownAt;
+  const record: TimingRecord = {
+    exerciseId: pendingTiming.exerciseId,
+    timestamp: Date.now(),
+    requestedMs: pendingTiming.requestedMs,
+    observedMs,
+    valid,
+    invalidReason,
+  };
+  pendingTiming = null;
+  timingRecords = appendTimingRecord(timingRecords, record);
+  saveTimingRecords(timingRecords, localStorage);
+}
 
 function clearTimers(): void {
   timers.forEach(timer => window.clearTimeout(timer));
@@ -181,20 +257,23 @@ function updateStats(): void {
 }
 
 function renderHistory(): void {
-  const history = loadHistory(localStorage, historyStorageKey(activeExercise.id));
+  const history = loadHistory(localStorage, historyStorageKey(activeExercise.id), activeExercise.id);
   if (history.length === 0) {
     summaryHistory.innerHTML = `<p class="history-empty">No past sessions yet.</p>`;
     return;
   }
 
+  const summaryMetrics = activeExercise.metrics.filter(m => m.showInSummary);
   const rows = history
     .map(entry => {
       const date = new Date(entry.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-      return `<li class="history-row">
-        <span class="history-date">${date}</span>
-        <span class="history-accuracy">${entry.accuracyPct}%</span>
-        <span class="history-interval">${entry.lowestPresentationMs}<span class="unit">ms</span></span>
-      </li>`;
+      const cells = summaryMetrics
+        .map(
+          m =>
+            `<span class="history-metric"><span class="history-metric-label">${m.label}</span>${formatMetricValue(entry.metrics[m.key], m.unit)}</span>`,
+        )
+        .join("");
+      return `<li class="history-row"><span class="history-date">${date}</span>${cells}</li>`;
     })
     .join("");
   summaryHistory.innerHTML = `
@@ -208,13 +287,102 @@ function renderSummary(): void {
   renderHistory();
 }
 
+function renderProgressPanel(): void {
+  const history = loadHistory(localStorage, historyStorageKey(activeExercise.id), activeExercise.id); // newest-first
+  const primary = activeExercise.metrics.find(m => m.key === activeExercise.primaryMetricKey) ?? null;
+  const chronological = [...history].reverse();
+  const values = chronological.map(entry => {
+    const v = entry.metrics[activeExercise.primaryMetricKey];
+    return typeof v === "number" ? v : null;
+  });
+  const points = sparklinePoints(values, 280, 56);
+
+  const directionLabel =
+    primary?.direction === "lower" ? "lower is better" : primary?.direction === "higher" ? "higher is better" : "no simple better/worse reading";
+
+  const rows = history
+    .slice(0, 8)
+    .map((entry, i) => {
+      const next = history[i + 1]; // one session older, since history is newest-first
+      const current = typeof entry.metrics[activeExercise.primaryMetricKey] === "number" ? (entry.metrics[activeExercise.primaryMetricKey] as number) : null;
+      const previous = next && typeof next.metrics[activeExercise.primaryMetricKey] === "number" ? (next.metrics[activeExercise.primaryMetricKey] as number) : null;
+      const direction = primary ? trend(current, previous, primary.direction) : "unknown";
+      const date = new Date(entry.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      return `<li class="progress-row">
+        <span class="progress-date">${date}</span>
+        <span class="progress-value">${formatMetricValue(current, primary?.unit)}</span>
+        <span class="progress-trend trend-${direction}" aria-hidden="true">${trendSymbol(direction)}</span>
+      </li>`;
+    })
+    .join("");
+
+  progressPanel.innerHTML = `
+    <p class="eyebrow">${primary?.label ?? "Primary metric"}${primary ? ` — ${directionLabel}` : ""}</p>
+    ${
+      points
+        ? `<svg class="sparkline" viewBox="0 0 280 56" preserveAspectRatio="none" aria-hidden="true"><polyline points="${points}"></polyline></svg>`
+        : `<p class="history-empty">Not enough sessions yet for a trend line.</p>`
+    }
+    ${history.length === 0 ? `<p class="history-empty">No past sessions yet.</p>` : `<ul class="progress-list">${rows}</ul>`}
+    <p class="progress-caution">Session-to-session changes may reflect familiarity, fatigue, device conditions or normal variability — especially over just a few sessions.</p>
+  `;
+}
+
+function candidatesByCategory(): Partial<Record<RecommendedCategory, string[]>> {
+  const map: Partial<Record<RecommendedCategory, string[]>> = {};
+  for (const exercise of exercises) {
+    if (!exercise.recommendedCategory) continue;
+    const list = map[exercise.recommendedCategory] ?? [];
+    list.push(exercise.id);
+    map[exercise.recommendedCategory] = list;
+  }
+  return map;
+}
+
+function renderRecommendedPanel(): void {
+  if (!recommendedPicks || recommendedPicks.length === 0) {
+    recommendedPanel.innerHTML = `<p class="history-empty">Every slot was skipped. Reopen "Recommended session" to build a new one.</p>`;
+    return;
+  }
+  const totalMinutes = recommendedPicks.reduce((sum, pick) => {
+    const exercise = exercises.find(e => e.id === pick.exerciseId);
+    return sum + (exercise?.expectedSessionMinutes ?? 0);
+  }, 0);
+  const rows = recommendedPicks
+    .map((pick, i) => {
+      const exercise = exercises.find(e => e.id === pick.exerciseId);
+      if (!exercise) return "";
+      return `<li class="recommended-row">
+        <div>
+          <span class="eyebrow">${CATEGORY_LABEL[pick.category]}</span>
+          <span class="recommended-name">${exercise.name}</span>
+          <span class="recommended-minutes">~${exercise.expectedSessionMinutes ?? "a few"} min</span>
+        </div>
+        <div class="recommended-actions">
+          <button type="button" class="secondary" data-recommended-start="${i}">Start</button>
+          <button type="button" class="quiet" data-recommended-replace="${i}">Replace</button>
+          <button type="button" class="quiet" data-recommended-skip="${i}">Skip</button>
+        </div>
+      </li>`;
+    })
+    .join("");
+  recommendedPanel.innerHTML = `
+    <p class="eyebrow">Recommended session — about ${totalMinutes} min</p>
+    <p class="recommended-caution">A software-designed rotation for variety, not a clinically validated prescription. Start, swap or skip anything below.</p>
+    <ul class="recommended-list">${rows}</ul>
+  `;
+}
+
 function renderPicker(): void {
   exerciseCards.innerHTML = exercises
     .map(exercise => {
       const exerciseState = exercise.id === activeExercise.id ? state : loadExerciseState(exercise);
       const active = exercise.id === activeExercise.id;
       return `<button type="button" class="exercise-card${active ? " active" : ""}" data-exercise-id="${exercise.id}" aria-pressed="${active}">
-        <span class="eyebrow">Exercise No.&nbsp;${String(exercise.number).padStart(2, "0")}</span>
+        <span class="exercise-card-top">
+          <span class="eyebrow">Exercise No.&nbsp;${String(exercise.number).padStart(2, "0")}</span>
+          <span class="mode-badge mode-${exercise.mode}">${MODE_LABEL[exercise.mode]}</span>
+        </span>
         <span class="exercise-card-name">${exercise.name}</span>
         <span class="exercise-card-summary">${exercise.pickerSummary(exerciseState)}</span>
       </button>`;
@@ -222,16 +390,34 @@ function renderPicker(): void {
     .join("");
 }
 
+function updatePracticeUI(): void {
+  practiceBanner.hidden = !practiceMode;
+  if (practiceMode) {
+    practiceBanner.textContent =
+      `Practising ${activeExercise.name} — nothing here affects your saved progress or history.` +
+      (activeExercise.practiceNote ? ` ${activeExercise.practiceNote}` : "");
+  }
+  practise.textContent = practiceMode ? "End practice" : "Practise";
+  reset.disabled = practiceMode;
+
+  const neverPracticed = !localStorage.getItem(practicedFlagKey(activeExercise.id));
+  const neverPlayed = activeExercise.attempts(state) === 0;
+  practiceHint.hidden = practiceMode || !(neverPracticed && neverPlayed);
+  practiceHint.textContent = "New to this exercise? Try Practise first — it won't affect your saved progress.";
+}
+
 function setPhase(next: Phase): void {
   phase = next;
   const paused = phase === "paused";
   const complete = phase === "complete";
   const canAnswer = phase === "responding";
+  const midFlash = phase === "showing" || phase === "preparing";
 
   answerControls.disabled = !canAnswer;
   pause.textContent = paused ? "Resume" : "Pause";
   pause.disabled = complete;
   replay.disabled = !(phase === "responding" && trial !== null);
+  practise.disabled = midFlash;
   start.disabled = !["ready", "complete"].includes(phase);
   response.hidden = complete;
   summaryPanel.hidden = !complete;
@@ -239,8 +425,8 @@ function setPhase(next: Phase): void {
 
   if (complete) {
     start.textContent = "Start new session";
-    fieldMessage.textContent = "Session complete";
-    renderSummary();
+    fieldMessage.textContent = practiceMode ? "Practice set complete" : "Session complete";
+    if (!practiceMode) renderSummary();
   } else if (phase === "ready") {
     start.textContent = activeExercise.attempts(state) === 0 ? "Start trial" : "Next trial";
     fieldMessage.textContent = "Ready";
@@ -253,6 +439,8 @@ function setPhase(next: Phase): void {
   } else if (phase === "paused") {
     fieldMessage.textContent = "Paused";
   }
+
+  if (!progressPanel.hidden) renderProgressPanel();
 }
 
 function hideStimuli(): void {
@@ -268,25 +456,33 @@ function presentTrial(activeTrial: unknown): void {
   schedule(() => {
     if (phase !== "preparing") return;
     setPhase("showing");
+    const requestedMs = activeExercise.flashDurationMs(activeTrial);
+    pendingTiming = { exerciseId: activeExercise.id, requestedMs, shownAt: performance.now() };
     activeExercise.showTrial(activeTrial);
 
     schedule(() => {
       if (phase !== "showing") return;
+      finalizeTiming(true, null);
       hideStimuli();
       response.reset();
       setPhase("responding");
       activeExercise.beginResponse?.(activeTrial);
       response.querySelector<HTMLInputElement>("input")?.focus();
-    }, activeExercise.flashDurationMs(activeTrial));
+    }, requestedMs);
   }, 650);
 }
 
 function beginTrial(): void {
   if (phase === "complete") {
-    state = activeExercise.initialState;
+    if (practiceMode) {
+      const base = activeExercise.initialState;
+      state = activeExercise.practiceState ? activeExercise.practiceState(base) : base;
+    } else {
+      state = activeExercise.initialState;
+      saveExerciseState(activeExercise, state);
+    }
     trial = null;
     feedback.textContent = "";
-    saveExerciseState(activeExercise, state);
     updateStats();
     setPhase("ready");
   }
@@ -314,6 +510,7 @@ function pauseOrResume(): void {
   }
 
   const interruptedFlash = phase === "showing" || phase === "preparing";
+  if (interruptedFlash) finalizeTiming(false, "paused");
   clearTimers();
   hideStimuli();
   response.reset();
@@ -321,22 +518,54 @@ function pauseOrResume(): void {
     ? "Paused during the flash. That trial was discarded; restart it when ready."
     : "Progress saved. Resume when ready.";
   trial = null;
-  saveExerciseState(activeExercise, state);
+  if (!practiceMode) saveExerciseState(activeExercise, state);
   setPhase("paused");
 }
 
+function enterPractice(): void {
+  if (phase === "showing" || phase === "preparing") return;
+  clearTimers();
+  hideStimuli();
+  practiceMode = true;
+  localStorage.setItem(practicedFlagKey(activeExercise.id), "1");
+  const base = activeExercise.initialState;
+  state = activeExercise.practiceState ? activeExercise.practiceState(base) : base;
+  trial = null;
+  feedback.textContent = "";
+  delete feedback.dataset.result;
+  response.reset();
+  updateStats();
+  updatePracticeUI();
+  setPhase(activeExercise.isSessionComplete(state) ? "complete" : "ready");
+}
+
+function exitPractice(): void {
+  clearTimers();
+  hideStimuli();
+  practiceMode = false;
+  state = loadExerciseState(activeExercise);
+  trial = null;
+  feedback.textContent = "";
+  delete feedback.dataset.result;
+  response.reset();
+  updateStats();
+  updatePracticeUI();
+  setPhase(activeExercise.isSessionComplete(state) ? "complete" : "ready");
+}
+
 function selectExercise(exercise: Exercise): void {
-  if (exercise.id === activeExercise.id && state !== null) {
+  if (exercise.id === activeExercise.id && state !== null && !practiceMode) {
     renderPicker();
     return;
   }
 
   clearTimers();
+  practiceMode = false;
   activeExercise = exercise;
   state = loadExerciseState(exercise);
   trial = null;
 
-  exerciseEyebrow.textContent = `Exercise No. ${String(exercise.number).padStart(2, "0")}`;
+  exerciseEyebrow.textContent = `Exercise No. ${String(exercise.number).padStart(2, "0")}`;
   gameHeading.textContent = exercise.name;
   instructions.innerHTML = exercise.instructions;
   progressTrack.setAttribute("aria-valuemax", String(exercise.sessionLength));
@@ -348,8 +577,10 @@ function selectExercise(exercise: Exercise): void {
   feedback.textContent = "";
   delete feedback.dataset.result;
   response.reset();
+  progressPanel.hidden = true;
 
   updateStats();
+  updatePracticeUI();
   renderPicker();
   setPhase(exercise.isSessionComplete(state) ? "complete" : "ready");
 }
@@ -357,6 +588,56 @@ function selectExercise(exercise: Exercise): void {
 start.addEventListener("click", beginTrial);
 replay.addEventListener("click", replayTrial);
 pause.addEventListener("click", pauseOrResume);
+practise.addEventListener("click", () => (practiceMode ? exitPractice() : enterPractice()));
+
+progressToggle.addEventListener("click", () => {
+  const willShow = progressPanel.hidden;
+  progressPanel.hidden = !willShow;
+  if (willShow) renderProgressPanel();
+});
+
+recommendedToggle.addEventListener("click", () => {
+  if (recommendedPicks) {
+    recommendedPicks = null;
+    recommendedPanel.hidden = true;
+    recommendedPanel.innerHTML = "";
+    return;
+  }
+  const lastPicksRaw = localStorage.getItem(RECOMMENDED_LAST_KEY);
+  let lastPicks: string[] = [];
+  try {
+    const parsed: unknown = lastPicksRaw ? JSON.parse(lastPicksRaw) : [];
+    if (Array.isArray(parsed)) lastPicks = parsed.filter((v): v is string => typeof v === "string");
+  } catch {
+    lastPicks = [];
+  }
+  recommendedPicks = chooseRecommendedSession(candidatesByCategory(), lastPicks);
+  localStorage.setItem(RECOMMENDED_LAST_KEY, JSON.stringify(recommendedPicks.map(p => p.exerciseId)));
+  recommendedPanel.hidden = false;
+  renderRecommendedPanel();
+});
+
+recommendedPanel.addEventListener("click", event => {
+  const target = event.target as HTMLElement;
+  if (!recommendedPicks) return;
+
+  const startAttr = target.dataset.recommendedStart;
+  const replaceAttr = target.dataset.recommendedReplace;
+  const skipAttr = target.dataset.recommendedSkip;
+
+  if (startAttr !== undefined) {
+    const pick = recommendedPicks[Number(startAttr)];
+    const exercise = pick && exercises.find(e => e.id === pick.exerciseId);
+    if (exercise) selectExercise(exercise);
+  } else if (replaceAttr !== undefined) {
+    recommendedPicks = replacePick(recommendedPicks, Number(replaceAttr), candidatesByCategory());
+    localStorage.setItem(RECOMMENDED_LAST_KEY, JSON.stringify(recommendedPicks.map(p => p.exerciseId)));
+    renderRecommendedPanel();
+  } else if (skipAttr !== undefined) {
+    recommendedPicks = recommendedPicks.filter((_, i) => i !== Number(skipAttr));
+    renderRecommendedPanel();
+  }
+});
 
 exerciseCards.addEventListener("click", event => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-exercise-id]");
@@ -376,6 +657,7 @@ response.addEventListener("submit", event => {
   if (!(phase === "responding" || phase === "showing") || !trial) return;
   if (phase === "showing") {
     clearTimers();
+    finalizeTiming(true, null);
     hideStimuli();
   }
 
@@ -398,14 +680,18 @@ response.addEventListener("submit", event => {
   }
 
   trial = null;
-  saveExerciseState(activeExercise, state);
+  if (!practiceMode) saveExerciseState(activeExercise, state);
   updateStats();
 
   const sessionJustCompleted = activeExercise.isSessionComplete(state);
-  if (sessionJustCompleted) {
-    const entry = activeExercise.historyEntry(state);
-    if (entry) {
-      recordSession({ timestamp: Date.now(), ...entry }, localStorage, historyStorageKey(activeExercise.id));
+  if (sessionJustCompleted && !practiceMode) {
+    const metrics = activeExercise.historyEntry(state);
+    if (metrics) {
+      recordSession(
+        { exerciseId: activeExercise.id, timestamp: Date.now(), schemaVersion: 1, metrics },
+        localStorage,
+        historyStorageKey(activeExercise.id),
+      );
     }
   }
   setPhase(sessionJustCompleted ? "complete" : "ready");
@@ -413,7 +699,9 @@ response.addEventListener("submit", event => {
 });
 
 reset.addEventListener("click", () => {
+  if (practiceMode) return;
   clearTimers();
+  finalizeTiming(false, "reset");
   localStorage.removeItem(progressStorageKey(activeExercise.id));
   state = activeExercise.initialState;
   trial = null;
@@ -423,23 +711,39 @@ reset.addEventListener("click", () => {
   feedback.textContent = "Progress reset.";
   delete feedback.dataset.result;
   updateStats();
+  updatePracticeUI();
   renderPicker();
   setPhase("ready");
 });
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && ["preparing", "showing"].includes(phase)) {
+    finalizeTiming(false, "tab hidden");
     clearTimers();
     hideStimuli();
     trial = null;
     feedback.textContent = "The flash was interrupted, so that trial was discarded.";
-    saveExerciseState(activeExercise, state);
+    if (!practiceMode) saveExerciseState(activeExercise, state);
     setPhase("ready");
   } else if (document.hidden) {
-    saveExerciseState(activeExercise, state);
+    if (!practiceMode) saveExerciseState(activeExercise, state);
   }
 });
 
-window.addEventListener("beforeunload", () => saveExerciseState(activeExercise, state));
+window.addEventListener("beforeunload", () => {
+  if (!practiceMode) saveExerciseState(activeExercise, state);
+});
+
+exportDiagnostics.addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(timingRecords, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "thoth-timing-diagnostics.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+});
 
 selectExercise(exercises[0] as Exercise);
