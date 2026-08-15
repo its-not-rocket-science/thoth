@@ -1,4 +1,11 @@
 import type { Exercise, ReadoutCell } from "../exercise";
+import type { MetricDescriptor } from "../types";
+
+const TRAIL_METRICS: MetricDescriptor[] = [
+  { key: "bestCompletionMs", label: "Best time", unit: "ms", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "totalErrors", label: "Total errors", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "completedCount", label: "Completed", direction: "higher", showInSummary: true },
+];
 
 const NUMBERS = ["1", "2", "3", "4", "5", "6"];
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
@@ -92,9 +99,20 @@ const INITIAL_STATE: TrailState = { attempts: 0, completedCount: 0, totalErrors:
  * exercises, given each round itself takes a nontrivial amount of time.
  */
 const SESSION_LENGTH = 5;
-const CELL_SIZE_PX = 44; // matches .field's own background-size grid
+// Matches .field's own background-size grid, in rem (not a fixed px), so
+// the grid cell a node is centred in scales the same way the node's own
+// rem-sized diameter does. If these two drifted apart (e.g. a hardcoded
+// px cell against a rem-sized node), browser/OS text-size-adjustment would
+// grow the node past its cell without growing its spacing, letting
+// neighbouring nodes visually overlap.
+const CELL_SIZE_REM = 2.75;
 const ROUND_TIMEOUT_MS = 60_000;
 const ERROR_FLASH_MS = 400;
+
+function rootFontSizePx(): number {
+  const parsed = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16;
+}
 
 /** Pure: folds one round's outcome into the running session totals. */
 export function summarizeRound(state: TrailState, outcome: TrailOutcome): TrailState {
@@ -147,7 +165,11 @@ export function createTaskSwitchingExercise(): Exercise<TrailState, TrailTrial> 
   let submitted = false;
 
   function bounds(): TrailBounds {
-    return { width: field?.clientWidth || 400, height: field?.clientHeight || 300, cellSize: CELL_SIZE_PX };
+    return {
+      width: field?.clientWidth || 400,
+      height: field?.clientHeight || 300,
+      cellSize: CELL_SIZE_REM * rootFontSizePx(),
+    };
   }
 
   function finish(): void {
@@ -200,6 +222,14 @@ export function createTaskSwitchingExercise(): Exercise<TrailState, TrailTrial> 
       "<strong>1, A, 2, B, 3, C…</strong> — by clicking each one as fast as you can. A wrong click counts as an " +
       "error but doesn't stop the round; just find the right node and carry on.",
     sessionLength: SESSION_LENGTH,
+    // Fixed 12-node trail, no staircase — mirrors the standardised
+    // protocol Trail Making Test B itself uses, so completion time and
+    // error count are directly comparable session to session.
+    mode: "measurement",
+    metrics: TRAIL_METRICS,
+    primaryMetricKey: "bestCompletionMs",
+    recommendedCategory: "executive",
+    expectedSessionMinutes: 4,
 
     initialState: INITIAL_STATE,
 
@@ -246,12 +276,9 @@ export function createTaskSwitchingExercise(): Exercise<TrailState, TrailTrial> 
       return `Best ${formatSeconds(state.bestCompletionMs).replace(/<[^>]+>/g, "")} · ${state.completedCount}/${state.attempts} completed`;
     },
 
-    // Doesn't fit history.ts's score/accuracy/interval shape (completion
-    // time isn't a presentation interval, and rounds/errors don't map to
-    // score/accuracy cleanly) — same documented-exception pattern as the
-    // app's other non-UFOV exercises.
-    historyEntry(): null {
-      return null;
+    historyEntry(state: TrailState) {
+      if (state.attempts === 0) return null;
+      return { bestCompletionMs: state.bestCompletionMs, totalErrors: state.totalErrors, completedCount: state.completedCount };
     },
 
     mount(fieldContent: HTMLElement, answerControls: HTMLElement): void {

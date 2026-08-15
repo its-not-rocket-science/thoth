@@ -1,4 +1,10 @@
-import type { SessionHistoryEntry } from "./types";
+import type { ExerciseMode, MetricDescriptor } from "./types";
+
+/** Which slot a "recommended session" (see recommended.ts) can fill this
+ *  exercise into. Not every exercise needs one — an exercise with no
+ *  category is simply never picked by the rotation, e.g. multiple-object-
+ *  tracking, which doesn't fit any of the three slots the brief specifies. */
+export type RecommendedCategory = "ufov" | "orienting-search" | "executive";
 
 /** One label/value pair in the live readouts bar or session-complete
  *  summary panel. `value` is inserted as trusted inline HTML (matching the
@@ -32,6 +38,39 @@ export interface Exercise<TState = unknown, TTrial = unknown> {
   /** Trials per session, for the progress bar. */
   readonly sessionLength: number;
 
+  /** training / measurement / mixed — see ExerciseMode in types.ts and the
+   *  README's "Exercise classification" section for what each means and
+   *  why this exercise got the label it did. Shown as a small badge on the
+   *  exercise-picker card. */
+  readonly mode: ExerciseMode;
+  /** Every metric this exercise can report, for the picker card, session-
+   *  complete panel and progress tracker to render generically instead of
+   *  main.ts special-casing each exercise's own fields. */
+  readonly metrics: MetricDescriptor[];
+  /** Which entry in `metrics` the progress tracker charts by default —
+   *  must be a key present in `metrics`. */
+  readonly primaryMetricKey: string;
+  /** Which recommended-session slot this exercise can fill (see
+   *  recommended.ts); omit for exercises the rotation shouldn't pick. */
+  readonly recommendedCategory?: RecommendedCategory;
+  /** Rough wall-clock length of one full session, for the recommended-
+   *  session time estimate. Not measured — a planning estimate only. */
+  readonly expectedSessionMinutes?: number;
+  /** One or two sentences shown on this exercise's practice intro screen,
+   *  in addition to the exercise's own `instructions`. Optional — plain
+   *  instructions are enough for most exercises. */
+  readonly practiceNote?: string;
+  /** Optional: given the player's real (persisted) state, returns a state
+   *  to seed *practice* trials with instead — e.g. forcing a long
+   *  presentation duration or a small object count, so practice starts
+   *  easy regardless of where the player's real staircase currently sits.
+   *  Practice trials are otherwise generated and shown exactly like scored
+   *  ones (createTrial/showTrial/etc. all run unchanged); only the state
+   *  fed in differs, and the result is never scored or saved (see
+   *  main.ts's practice mode). Exercises without a staircase, or whose
+   *  default difficulty is already practice-appropriate, can omit this. */
+  practiceState?(state: TState): TState;
+
   readonly initialState: TState;
   /** Validates a JSON.parse() result from storage; null if unusable, in
    *  which case the host falls back to initialState rather than crash. */
@@ -45,10 +84,13 @@ export interface Exercise<TState = unknown, TTrial = unknown> {
   /** One-line "your last/best result" string for the exercise-picker
    *  card; a sensible default like "Not played yet" when state is fresh. */
   pickerSummary(state: TState): string;
-  /** Reduces this session's state to the fields history.ts needs; return
-   *  null for exercises that don't fit the score/accuracy/interval shape
-   *  (a documented exception, same as the app's other RT-based exercises). */
-  historyEntry(state: TState): Omit<SessionHistoryEntry, "timestamp"> | null;
+  /** Reduces this session's state to the metrics history.ts should record —
+   *  a plain key/value record matching this exercise's own `metrics`
+   *  descriptors (see types.ts's SessionHistoryEntry). The host stamps on
+   *  exerciseId/timestamp/schemaVersion; this only supplies the values.
+   *  Return null for a session that shouldn't be recorded at all (e.g.
+   *  still empty/fresh state) rather than recording zeros/nulls. */
+  historyEntry(state: TState): Record<string, number | string | null> | null;
 
   /** Builds this exercise's stimulus placeholders and answer controls
    *  once, into the shared #field content slot and #answer-controls

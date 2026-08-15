@@ -1,5 +1,12 @@
 import { SEARCH_SET_SIZE_STAIRCASE, stepStaircase } from "../game";
 import type { Exercise, ReadoutCell } from "../exercise";
+import type { MetricDescriptor } from "../types";
+
+const SEARCH_METRICS: MetricDescriptor[] = [
+  { key: "conjunctionSlope", label: "Conjunction slope", unit: "ms/item", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "featureSlope", label: "Feature slope", unit: "ms/item", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "accuracyPct", label: "Accuracy", unit: "%", direction: "higher", showInSummary: true },
+];
 
 type Shape = "circle" | "diamond";
 type Color = "brass" | "phosphor";
@@ -219,6 +226,20 @@ export function createVisualSearchExercise(): Exercise<SearchState, SearchTrial>
       "A grid of shapes will appear. One is the target — the only <strong>brass diamond</strong>. " +
       "Click it as fast as you can. Sometimes it stands out at a glance; sometimes you'll need to check each one.",
     sessionLength: SESSION_LENGTH,
+    // Set size adapts via the same staircase as the training exercises
+    // (a training element), but the scientifically meaningful output —
+    // the RT-by-set-size slope — is a measurement construct, not a score
+    // to maximise. See README's "Exercise classification" section.
+    mode: "mixed",
+    metrics: SEARCH_METRICS,
+    primaryMetricKey: "conjunctionSlope",
+    recommendedCategory: "orienting-search",
+    expectedSessionMinutes: 3,
+    practiceNote: "Practice starts at the smallest set size, so the target is easy to spot.",
+
+    practiceState(state: SearchState): SearchState {
+      return { ...state, setSize: SEARCH_SET_SIZE_STAIRCASE.min, setSizeStreak: 0 };
+    },
 
     initialState: INITIAL_STATE,
 
@@ -276,13 +297,13 @@ export function createVisualSearchExercise(): Exercise<SearchState, SearchTrial>
       return `Feature ${fmt(f)} · Conjunction ${fmt(c)}`;
     },
 
-    // Doesn't fit history.ts's score/accuracy/interval shape (set size
-    // isn't a presentation interval, and the slope — the number that
-    // actually matters here — has nowhere to go in that shape either);
-    // it's already surfaced as a live readout instead. Same documented-
-    // exception pattern as the app's other non-UFOV exercises.
-    historyEntry(): null {
-      return null;
+    historyEntry(state: SearchState) {
+      if (state.attempts === 0) return null;
+      return {
+        featureSlope: slope(state.feature),
+        conjunctionSlope: slope(state.conjunction),
+        accuracyPct: Math.round((state.correctCount / state.attempts) * 100),
+      };
     },
 
     mount(fieldContent: HTMLElement, answerControls: HTMLElement): void {

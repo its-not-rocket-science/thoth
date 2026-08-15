@@ -18,10 +18,17 @@ class FakeStorage implements StorageLike {
   }
 }
 
-const KEY = historyStorageKey("centre-edge");
+const EXERCISE_ID = "centre-edge";
+const KEY = historyStorageKey(EXERCISE_ID);
 
 function entry(overrides: Partial<SessionHistoryEntry> = {}): SessionHistoryEntry {
-  return { timestamp: 1000, score: 15, accuracyPct: 75, lowestPresentationMs: 620, ...overrides };
+  return {
+    exerciseId: EXERCISE_ID,
+    timestamp: 1000,
+    schemaVersion: 1,
+    metrics: { score: 15, accuracyPct: 75, lowestPresentationMs: 620 },
+    ...overrides,
+  };
 }
 
 describe("historyStorageKey", () => {
@@ -33,20 +40,20 @@ describe("historyStorageKey", () => {
 
 describe("loadHistory", () => {
   it("returns an empty array when nothing is saved", () => {
-    expect(loadHistory(new FakeStorage(), KEY)).toEqual([]);
+    expect(loadHistory(new FakeStorage(), KEY, EXERCISE_ID)).toEqual([]);
   });
 
   it("returns an empty array and clears storage for unparsable JSON", () => {
     const storage = new FakeStorage();
     storage.setItem(KEY, "{not json");
-    expect(loadHistory(storage, KEY)).toEqual([]);
+    expect(loadHistory(storage, KEY, EXERCISE_ID)).toEqual([]);
     expect(storage.getItem(KEY)).toBeNull();
   });
 
   it("returns an empty array for valid JSON that isn't an array", () => {
     const storage = new FakeStorage();
     storage.setItem(KEY, JSON.stringify({ not: "an array" }));
-    expect(loadHistory(storage, KEY)).toEqual([]);
+    expect(loadHistory(storage, KEY, EXERCISE_ID)).toEqual([]);
   });
 
   it("filters out malformed entries while keeping valid ones", () => {
@@ -61,7 +68,7 @@ describe("loadHistory", () => {
         "just a string",
       ]),
     );
-    const loaded = loadHistory(storage, KEY);
+    const loaded = loadHistory(storage, KEY, EXERCISE_ID);
     expect(loaded).toHaveLength(2);
     expect(loaded.map(e => e.timestamp)).toEqual([1, 2]);
   });
@@ -69,9 +76,38 @@ describe("loadHistory", () => {
   it("keeps different exercises' histories independent", () => {
     const storage = new FakeStorage();
     saveHistory([entry({ timestamp: 1 })], storage, historyStorageKey("centre-edge"));
-    saveHistory([entry({ timestamp: 2 }), entry({ timestamp: 3 })], storage, historyStorageKey("centre-only"));
-    expect(loadHistory(storage, historyStorageKey("centre-edge"))).toHaveLength(1);
-    expect(loadHistory(storage, historyStorageKey("centre-only"))).toHaveLength(2);
+    saveHistory(
+      [entry({ timestamp: 2, exerciseId: "centre-only" }), entry({ timestamp: 3, exerciseId: "centre-only" })],
+      storage,
+      historyStorageKey("centre-only"),
+    );
+    expect(loadHistory(storage, historyStorageKey("centre-edge"), "centre-edge")).toHaveLength(1);
+    expect(loadHistory(storage, historyStorageKey("centre-only"), "centre-only")).toHaveLength(2);
+  });
+
+  it("migrates pre-generalised-schema entries (score/accuracyPct/lowestPresentationMs, no metrics) into the metrics-record shape", () => {
+    const storage = new FakeStorage();
+    storage.setItem(KEY, JSON.stringify([{ timestamp: 5, score: 15, accuracyPct: 75, lowestPresentationMs: 620 }]));
+    const loaded = loadHistory(storage, KEY, EXERCISE_ID);
+    expect(loaded).toEqual([
+      {
+        exerciseId: EXERCISE_ID,
+        timestamp: 5,
+        schemaVersion: 1,
+        metrics: { score: 15, accuracyPct: 75, lowestPresentationMs: 620 },
+      },
+    ]);
+  });
+
+  it("keeps current-schema and legacy-schema entries side by side in one array", () => {
+    const storage = new FakeStorage();
+    storage.setItem(
+      KEY,
+      JSON.stringify([entry({ timestamp: 2 }), { timestamp: 1, score: 10, accuracyPct: 50, lowestPresentationMs: 900 }]),
+    );
+    const loaded = loadHistory(storage, KEY, EXERCISE_ID);
+    expect(loaded.map(e => e.timestamp)).toEqual([2, 1]);
+    expect(loaded[1]?.metrics).toEqual({ score: 10, accuracyPct: 50, lowestPresentationMs: 900 });
   });
 });
 
@@ -80,7 +116,7 @@ describe("saveHistory", () => {
     const storage = new FakeStorage();
     const entries = [entry({ timestamp: 1 }), entry({ timestamp: 2 })];
     saveHistory(entries, storage, KEY);
-    expect(loadHistory(storage, KEY)).toEqual(entries);
+    expect(loadHistory(storage, KEY, EXERCISE_ID)).toEqual(entries);
   });
 });
 
@@ -121,6 +157,6 @@ describe("recordSession", () => {
     const result = recordSession(entry({ timestamp: 2 }), storage, KEY);
 
     expect(result.map(e => e.timestamp)).toEqual([2, 1]);
-    expect(loadHistory(storage, KEY).map(e => e.timestamp)).toEqual([2, 1]);
+    expect(loadHistory(storage, KEY, EXERCISE_ID).map(e => e.timestamp)).toEqual([2, 1]);
   });
 });

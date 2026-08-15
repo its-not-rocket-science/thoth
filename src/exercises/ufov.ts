@@ -1,6 +1,15 @@
-import { createTrial, INITIAL_STATE, scoreTrial, summarizeSession } from "../game";
+import { createTrial, INITIAL_STATE, PRESENTATION_STAIRCASE, scoreTrial, summarizeSession } from "../game";
 import type { Exercise, ReadoutCell } from "../exercise";
-import type { CentralSymbol, PeripheralPosition, SessionState, Trial } from "../types";
+import type { CentralSymbol, MetricDescriptor, PeripheralPosition, SessionState, Trial } from "../types";
+
+/** Score/accuracy/lowest-interval — the classic UFOV threshold measures.
+ *  Shared by all three subtests below (only the instructions and which
+ *  fields the response form asks for differ). */
+const UFOV_METRICS: MetricDescriptor[] = [
+  { key: "lowestPresentationMs", label: "Lowest interval", unit: "ms", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "accuracyPct", label: "Accuracy", unit: "%", direction: "higher", showInPicker: true, showInSummary: true },
+  { key: "score", label: "Score", direction: "higher", showInSummary: true },
+];
 
 export interface UfovState {
   session: SessionState;
@@ -100,6 +109,24 @@ export function createUfovExercise(config: UfovConfig): Exercise<UfovState, Tria
     name: config.name,
     instructions: config.instructions,
     sessionLength: SESSION_LENGTH,
+    // All three UFOV subtests keep their adaptive presentation-interval
+    // staircase live for every scored trial: session-to-session numbers
+    // are a training curve, not a standardised measurement (see README's
+    // "Exercise classification" section).
+    mode: "training",
+    metrics: UFOV_METRICS,
+    primaryMetricKey: "lowestPresentationMs",
+    recommendedCategory: "ufov",
+    expectedSessionMinutes: 3,
+    practiceNote: "Practice starts at the slowest presentation interval, so the shapes stay on screen far longer than in a scored session.",
+
+    // Forces the presentation interval to its slowest (easiest) setting so
+    // a first-time player can actually see the stimulus, regardless of
+    // where their real staircase currently sits; distractor count (subtest
+    // 3 only) is left as-is since it's the thing being demonstrated.
+    practiceState(state: UfovState): UfovState {
+      return { ...state, session: { ...state.session, presentationMs: PRESENTATION_STAIRCASE.max, presentationStreak: 0 } };
+    },
 
     initialState: {
       session: { ...INITIAL_STATE },
@@ -174,6 +201,7 @@ export function createUfovExercise(config: UfovConfig): Exercise<UfovState, Tria
     },
 
     historyEntry(state: UfovState) {
+      if (state.session.attempts === 0) return null;
       const summary = summarizeSession(state.session, state.sessionLowestMs);
       return { score: summary.score, accuracyPct: summary.accuracyPct, lowestPresentationMs: summary.lowestPresentationMs };
     },

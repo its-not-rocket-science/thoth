@@ -1,6 +1,12 @@
 import { createMotTrial, MOT_OBJECT_COUNT_STAIRCASE, stepMotion, stepStaircase } from "../game";
 import type { Exercise, ReadoutCell } from "../exercise";
-import type { MotionBounds, MotionState, MotTrial } from "../types";
+import type { MetricDescriptor, MotionBounds, MotionState, MotTrial } from "../types";
+
+const MOT_METRICS: MetricDescriptor[] = [
+  { key: "bestObjectCount", label: "Most objects tracked", direction: "higher", showInPicker: true, showInSummary: true },
+  { key: "accuracyPct", label: "Accuracy", unit: "%", direction: "higher", showInPicker: true, showInSummary: true },
+  { key: "objectCount", label: "Objects (current)", direction: "neutral", showInSummary: false },
+];
 
 export interface MotState {
   score: number;
@@ -135,6 +141,18 @@ export function createMotExercise(): Exercise<MotState, MotTrial> {
       "A handful of identical dots will appear. A few will briefly turn <strong>brass</strong> — those are your targets. " +
       "Then every dot goes neutral and drifts around the field. When they stop, click every dot you believe was a target.",
     sessionLength: SESSION_LENGTH,
+    // Object count adapts continuously via the 2-down-1-up staircase, and
+    // no fixed protocol underlies it — a training task, like the UFOV
+    // subtests (see README's "Exercise classification" section).
+    mode: "training",
+    metrics: MOT_METRICS,
+    primaryMetricKey: "bestObjectCount",
+    expectedSessionMinutes: 4,
+    practiceNote: "Practice starts at the fewest objects the staircase allows.",
+
+    practiceState(state: MotState): MotState {
+      return { ...state, objectCount: MOT_OBJECT_COUNT_STAIRCASE.min, objectCountStreak: 0 };
+    },
 
     initialState: INITIAL_STATE,
 
@@ -191,11 +209,10 @@ export function createMotExercise(): Exercise<MotState, MotTrial> {
       return `Best ${best} · Last ${state.score}/${SESSION_LENGTH} (${accuracy})`;
     },
 
-    // Doesn't fit history.ts's score/accuracy/interval shape — object count
-    // isn't a presentation interval — so, like the app's RT-based
-    // exercises, it opts out of session history rather than misreporting.
-    historyEntry(): null {
-      return null;
+    historyEntry(state: MotState) {
+      if (state.attempts === 0) return null;
+      const accuracyPct = Math.round((state.score / state.attempts) * 100);
+      return { bestObjectCount: state.bestObjectCount, accuracyPct, objectCount: state.objectCount };
     },
 
     mount(fieldContent: HTMLElement, answerControls: HTMLElement): void {

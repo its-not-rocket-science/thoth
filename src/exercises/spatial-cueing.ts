@@ -1,5 +1,15 @@
 import type { Exercise, ReadoutCell } from "../exercise";
-import type { PeripheralPosition } from "../types";
+import type { MetricDescriptor, PeripheralPosition } from "../types";
+
+const CUEING_METRICS: MetricDescriptor[] = [
+  { key: "meanValidRt", label: "Valid RT", unit: "ms", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "meanInvalidRt", label: "Invalid RT", unit: "ms", direction: "lower", showInSummary: true },
+  // Both a very small and a very large validity effect can reflect noise
+  // in a 20-trial session rather than a real change in orienting cost, so
+  // this is deliberately not labelled "lower is better" the way the two
+  // raw RTs above are.
+  { key: "validityEffect", label: "Validity effect", unit: "ms", direction: "neutral", showInSummary: true },
+];
 
 const POSITIONS: PeripheralPosition[] = [0, 1, 2, 3, 4, 5, 6, 7];
 const SESSION_LENGTH = 20;
@@ -158,6 +168,15 @@ export function createSpatialCueingExercise(): Exercise<CueingState, CueingTrial
       "a target will appear at a position (usually the cued one). Press <strong>Space</strong> or click " +
       "the response button the instant you see the target.",
     sessionLength: SESSION_LENGTH,
+    // Fixed 80/20 validity ratio, no staircase — the manipulation of
+    // interest (the RT cost of an invalid cue) is measured, not trained,
+    // so session-to-session numbers are directly comparable the way a
+    // standardised measure's would be.
+    mode: "measurement",
+    metrics: CUEING_METRICS,
+    primaryMetricKey: "meanValidRt",
+    recommendedCategory: "orienting-search",
+    expectedSessionMinutes: 3,
 
     initialState: INITIAL_STATE,
 
@@ -207,28 +226,35 @@ export function createSpatialCueingExercise(): Exercise<CueingState, CueingTrial
       return `Validity effect ${ve === null ? "—" : `${Math.round(ve)}ms`} · ${state.attempts}/${SESSION_LENGTH} trials`;
     },
 
-    // Doesn't fit history.ts's score/accuracy/interval shape — this is a
-    // reaction-time task, not scored right/wrong at a presentation
-    // duration — so it opts out of session history, like the other
-    // documented-exception exercises.
-    historyEntry(): null {
-      return null;
+    historyEntry(state: CueingState) {
+      if (state.attempts === 0) return null;
+      return {
+        meanValidRt: meanValidRt(state),
+        meanInvalidRt: meanInvalidRt(state),
+        validityEffect: validityEffect(state),
+        timeouts: state.timeouts,
+      };
     },
 
     mount(fieldContent: HTMLElement, answerControls: HTMLElement): void {
       field = fieldContent.closest<HTMLElement>(".field") ?? fieldContent;
       fieldContent.innerHTML = `
         <div id="cueing-marker" class="cueing-marker" hidden></div>
-        <button type="button" id="cueing-respond" class="cueing-respond-button">Respond</button>
       `;
       marker = fieldContent.querySelector<HTMLDivElement>("#cueing-marker");
-      fieldContent.querySelector<HTMLButtonElement>("#cueing-respond")?.addEventListener("click", handleResponse);
 
       answerControlsEl = answerControls as HTMLFieldSetElement;
+      // The respond button lives in the answer-controls panel, not as an
+      // absolutely-positioned overlay on the field: the field's peripheral
+      // target positions cover a full ring around the centre (including
+      // straight down), so any fixed spot inside the field risks sitting
+      // right on top of a target. Below the field it can never collide.
       answerControls.innerHTML = `
         <legend>Respond to the target</legend>
-        <p class="question">Press Space or click the button above the instant the target appears. There's nothing to fill in here.</p>
+        <p class="question">Press Space or click the button the instant the target appears. There's nothing to fill in here.</p>
+        <button type="button" id="cueing-respond" class="primary submit-answer">Respond</button>
       `;
+      answerControls.querySelector<HTMLButtonElement>("#cueing-respond")?.addEventListener("click", handleResponse);
 
       // Idempotent: re-mounting (switching back to this exercise) must not
       // accumulate duplicate document-level listeners.
