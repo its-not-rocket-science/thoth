@@ -1,18 +1,51 @@
-import { CPT_ISI_STAIRCASE, stepStaircase } from "../game";
 import type { Exercise, ReadoutCell } from "../exercise";
+import type { MetricDescriptor } from "../types";
 
 const SESSION_LENGTH = 1;
-/** "At least 60-90 seconds of continuous trials" per the brief; 65s sits
- *  at the low end of that range given this is also the app's most
- *  fatiguing exercise by design. */
-const STREAM_DURATION_MS = 65_000;
-const GLYPH_VISIBLE_MS = 400;
+/**
+ * Standardised measurement design (see README's "Sustained attention" and
+ * "Exercise classification" sections for the full rationale). The brief's
+ * roadmap item asked for training-mode/measurement-mode CPT behaviour to be
+ * separated; this exercise took the brief's documented fallback instead —
+ * "if supporting two modes would add too much complexity, prefer
+ * standardisation over adaptation" — because a *second* CPT mode with its
+ * own adaptive staircase would double the surface area of the app's most
+ * fatiguing exercise for a training benefit no other exercise here relies
+ * on this heavily to deliver. So there is exactly one CPT protocol, and
+ * it's the standardised one:
+ *
+ *   - a fixed EVENT_COUNT of events per stream (not "however many fit in a
+ *     wall-clock duration"), so every session has the same denominator;
+ *   - a fixed inter-stimulus interval (FIXED_ISI_MS) — no staircase, no
+ *     adaptation, so timing is identical across every session;
+ *   - a fixed go/no-go ratio, realised as an exact NO_GO_COUNT drawn into a
+ *     shuffled deck (see buildEventDeck) rather than a per-event
+ *     probability draw, so the *ratio* doesn't merely average out over a
+ *     long stream but is exactly the same count every time.
+ *
+ * The commission/omission/mean-RT numbers this produces are therefore
+ * directly comparable session to session, the way a fixed experimental
+ * protocol's would be — this exercise is classified "measurement", not
+ * "training" or "mixed", on that basis.
+ */
+const EVENT_COUNT = 54;
 const NO_GO_RATE = 0.15;
-const INITIAL_ISI_MS = 1200;
-/** Safety margin above the internal stream loop's own natural completion
- *  time — finalizeStream() below always finishes (and early-submits) well
- *  before this; it's only a fallback if that loop somehow got stuck. */
+const NO_GO_COUNT = Math.round(EVENT_COUNT * NO_GO_RATE);
+const FIXED_ISI_MS = 1200;
+const GLYPH_VISIBLE_MS = 400;
+/** Safety margin above EVENT_COUNT * FIXED_ISI_MS, the stream's own exact
+ *  natural duration — finalizeStream() below always finishes (and early-
+ *  submits) well before this; it's only a fallback if that loop somehow
+ *  got stuck. */
 const FLASH_SAFETY_MARGIN_MS = 3000;
+const STREAM_DURATION_MS = EVENT_COUNT * FIXED_ISI_MS;
+
+const CPT_METRICS: MetricDescriptor[] = [
+  { key: "commissionErrors", label: "Commission errors", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "omissionErrors", label: "Omission errors", direction: "lower", showInPicker: true, showInSummary: true },
+  { key: "meanGoRt", label: "Mean go RT", unit: "ms", direction: "lower", showInSummary: true },
+  { key: "eventCount", label: "Events", direction: "neutral", showInSummary: false },
+];
 
 export interface CptState {
   attempts: number;
@@ -20,10 +53,6 @@ export interface CptState {
   omissionErrors: number;
   goHitCount: number;
   goRtSum: number;
-  isi: number;
-  isiStreak: number;
-  /** Fastest ISI ever reached at the end of a stream — lower is harder. */
-  bestIsi: number | null;
 }
 
 const INITIAL_STATE: CptState = {
@@ -32,9 +61,6 @@ const INITIAL_STATE: CptState = {
   omissionErrors: 0,
   goHitCount: 0,
   goRtSum: 0,
-  isi: INITIAL_ISI_MS,
-  isiStreak: 0,
-  bestIsi: null,
 };
 
 export interface CptOutcome {
@@ -42,8 +68,6 @@ export interface CptOutcome {
   omissionErrors: number;
   goHitCount: number;
   goRtSum: number;
-  finalIsi: number;
-  finalIsiStreak: number;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -54,26 +78,31 @@ function numberOr(value: unknown, fallback: number): number {
   return isFiniteNumber(value) ? value : fallback;
 }
 
-/** Pure: whether a given random draw lands on a no-go event, wrapped so
- *  the stream's mix can be tested statistically without depending on the
- *  real RNG. */
-export function isNoGoEvent(rng: () => number = Math.random, noGoRate: number = NO_GO_RATE): boolean {
-  return rng() < noGoRate;
+/** Pure: builds one stream's exact sequence of go/no-go events — precisely
+ *  `noGoCount` no-go events among `eventCount` total, in random order, so
+ *  the go/no-go ratio is exact rather than merely probable over a long
+ *  stream (the standardisation this exercise's measurement design depends
+ *  on — see the module comment above). Takes an injectable rng purely so
+ *  the shuffle can be tested deterministically. */
+export function buildEventDeck(eventCount: number, noGoCount: number, rng: () => number = Math.random): boolean[] {
+  const clampedNoGo = Math.max(0, Math.min(eventCount, noGoCount));
+  const deck = Array.from({ length: eventCount }, (_, i) => i < clampedNoGo);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [deck[i], deck[j]] = [deck[j] as boolean, deck[i] as boolean];
+  }
+  return deck;
 }
 
 /** Pure: folds one full stream's outcome into the running session
  *  totals. */
 export function summarizeStream(state: CptState, outcome: CptOutcome): CptState {
-  const bestIsi = state.bestIsi === null || outcome.finalIsi < state.bestIsi ? outcome.finalIsi : state.bestIsi;
   return {
     attempts: state.attempts + 1,
     commissionErrors: state.commissionErrors + outcome.commissionErrors,
     omissionErrors: state.omissionErrors + outcome.omissionErrors,
     goHitCount: state.goHitCount + outcome.goHitCount,
     goRtSum: state.goRtSum + outcome.goRtSum,
-    isi: outcome.finalIsi,
-    isiStreak: outcome.finalIsiStreak,
-    bestIsi,
   };
 }
 
@@ -89,14 +118,15 @@ function msCell(value: number | null): string {
  * "Sustained attention": grounded in the continuous performance test (CPT)
  * literature (e.g. Rosvold et al. 1956) — vigilance and response
  * inhibition over an extended period, a distinct construct from every
- * flash-judgment exercise above. A rapid stream of go/no-go central
- * glyphs runs for ~65s; the player responds to "go" glyphs (circles) and
- * withholds on rare "no-go" glyphs (diamonds, ~15% of the stream).
- * Doesn't fit history.ts's score/accuracy/interval shape (there's no
- * single presentation duration — the stream contains one adapting ISI
- * across dozens of events, and commission/omission/RT don't collapse
- * into a single score), so — like the app's other reaction-time-based
- * exercises — it uses its own readouts and opts out of session history.
+ * flash-judgment exercise above. A stream of exactly EVENT_COUNT go/no-go
+ * central glyphs runs at a fixed pace (see the module comment above); the
+ * player responds to "go" glyphs (circles) and withholds on "no-go" glyphs
+ * (diamonds, NO_GO_COUNT of the stream). Doesn't fit the UFOV exercises'
+ * score/accuracy/interval shape (there's no single presentation duration —
+ * the stream contains dozens of discrete events — and commission/omission/
+ * RT don't collapse into one score), so it defines its own metric set (see
+ * CPT_METRICS above) the way the app's other reaction-time-based exercises
+ * do.
  */
 export function createSustainedAttentionExercise(): Exercise<CptState, Record<string, never>> {
   let glyph: HTMLDivElement | null = null;
@@ -111,13 +141,13 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
   let currentEventIsNoGo = false;
   let currentEventResponded = false;
   let submitted = false;
+  let eventDeck: boolean[] = [];
+  let eventIndex = 0;
 
   let commissionErrors = 0;
   let omissionErrors = 0;
   let goHitCount = 0;
   let goRtSum = 0;
-  let isi = INITIAL_ISI_MS;
-  let isiStreak = 0;
 
   function clearAllTimers(): void {
     timers.forEach(id => window.clearTimeout(id));
@@ -145,12 +175,13 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
 
   function scheduleNextEvent(): void {
     if (streamStart === null) return;
-    if (performance.now() - streamStart >= STREAM_DURATION_MS) {
+    if (eventIndex >= eventDeck.length) {
       finalizeStream();
       return;
     }
 
-    currentEventIsNoGo = isNoGoEvent();
+    currentEventIsNoGo = eventDeck[eventIndex] ?? false;
+    eventIndex++;
     currentEventResponded = false;
     eventOnsetTime = performance.now();
     if (glyph) {
@@ -166,14 +197,10 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
 
     timers.push(
       window.setTimeout(() => {
-        const eventCorrect = currentEventIsNoGo ? !currentEventResponded : currentEventResponded;
         if (!currentEventResponded && !currentEventIsNoGo) omissionErrors++;
-        const staircase = stepStaircase({ value: isi, streak: isiStreak }, eventCorrect, CPT_ISI_STAIRCASE);
-        isi = staircase.value;
-        isiStreak = staircase.streak;
         eventOnsetTime = null;
         scheduleNextEvent();
-      }, isi),
+      }, FIXED_ISI_MS),
     );
   }
 
@@ -201,9 +228,19 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
     number: 8,
     name: "Sustained attention",
     instructions:
-      "Circles and diamonds will stream past the centre for about a minute. Press <strong>Space</strong> or click " +
+      `Circles and diamonds will stream past the centre at a fixed pace, ${EVENT_COUNT} events in all. Press <strong>Space</strong> or click ` +
       "the response button for every <strong>circle</strong> — but withhold for the rare <strong>diamond</strong>.",
     sessionLength: SESSION_LENGTH,
+    mode: "measurement",
+    metrics: CPT_METRICS,
+    primaryMetricKey: "meanGoRt",
+    recommendedCategory: "executive",
+    expectedSessionMinutes: Math.round(STREAM_DURATION_MS / 60_000) || 1,
+    // The fixed event count/ISI that make this exercise a standardised
+    // measurement (see the module comment above) leave no per-session knob
+    // for practiceState to ease — practice runs the same full-length
+    // stream, just unscored and unsaved.
+    practiceNote: "Practice runs the same full-length stream as a scored session, just unscored.",
 
     initialState: INITIAL_STATE,
 
@@ -217,9 +254,6 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
         omissionErrors: Math.max(0, numberOr(v.omissionErrors, 0)),
         goHitCount: Math.max(0, numberOr(v.goHitCount, 0)),
         goRtSum: Math.max(0, numberOr(v.goRtSum, 0)),
-        isi: Math.max(CPT_ISI_STAIRCASE.min, Math.min(CPT_ISI_STAIRCASE.max, numberOr(v.isi, INITIAL_ISI_MS))),
-        isiStreak: Math.max(0, numberOr(v.isiStreak, 0)),
-        bestIsi: isFiniteNumber(v.bestIsi) ? v.bestIsi : null,
       };
     },
 
@@ -228,7 +262,7 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
         { label: "Commission errors", value: String(state.commissionErrors) },
         { label: "Omission errors", value: String(state.omissionErrors) },
         { label: "Mean go RT", value: msCell(meanGoRt(state)) },
-        { label: "ISI", value: msCell(state.isi) },
+        { label: "ISI", value: msCell(FIXED_ISI_MS) },
       ];
     },
 
@@ -237,7 +271,7 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
         { label: "Commission errors", value: String(state.commissionErrors) },
         { label: "Omission errors", value: String(state.omissionErrors) },
         { label: "Mean go RT", value: msCell(meanGoRt(state)) },
-        { label: "Fastest ISI", value: msCell(state.bestIsi) },
+        { label: "Events", value: String(EVENT_COUNT) },
       ];
     },
 
@@ -255,11 +289,14 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
       return `Commission ${state.commissionErrors} · Omission ${state.omissionErrors} · ${rt === null ? "—" : `${Math.round(rt)}ms`} avg go RT`;
     },
 
-    // Doesn't fit history.ts's score/accuracy/interval shape — see the
-    // module comment above. Same documented-exception pattern as the
-    // app's other reaction-time-based exercises.
-    historyEntry(): null {
-      return null;
+    historyEntry(state: CptState) {
+      if (state.attempts === 0) return null;
+      return {
+        commissionErrors: state.commissionErrors,
+        omissionErrors: state.omissionErrors,
+        meanGoRt: meanGoRt(state),
+        eventCount: EVENT_COUNT,
+      };
     },
 
     mount(fieldContent: HTMLElement, answerControls: HTMLElement): void {
@@ -269,19 +306,22 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
           <div id="cpt-timer-fill" class="cpt-timer-fill"></div>
         </div>
         <span id="cpt-timer-label" class="cpt-timer-label" role="status"></span>
-        <button type="button" id="cpt-respond" class="cueing-respond-button">Respond</button>
       `;
       glyph = fieldContent.querySelector<HTMLDivElement>("#cpt-glyph");
       timerFill = fieldContent.querySelector<HTMLDivElement>("#cpt-timer-fill");
       if (timerFill) timerFill.style.width = "0%";
       timerLabel = fieldContent.querySelector<HTMLSpanElement>("#cpt-timer-label");
-      fieldContent.querySelector<HTMLButtonElement>("#cpt-respond")?.addEventListener("click", handleResponse);
 
       answerControlsEl = answerControls as HTMLFieldSetElement;
+      // Respond button lives in the answer-controls panel rather than as an
+      // overlay on the field, so it can never sit on top of the centred
+      // circle/diamond glyph (see the same fix in spatial-cueing.ts).
       answerControls.innerHTML = `
         <legend>Go, or no-go</legend>
         <p class="question">Respond to every circle. Let diamonds pass without responding.</p>
+        <button type="button" id="cpt-respond" class="primary submit-answer">Respond</button>
       `;
+      answerControls.querySelector<HTMLButtonElement>("#cpt-respond")?.addEventListener("click", handleResponse);
 
       // Idempotent: re-mounting (switching back to this exercise) must not
       // accumulate duplicate document-level listeners.
@@ -289,9 +329,7 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
       document.addEventListener("keydown", onKeydown);
     },
 
-    createTrial(state: CptState): Record<string, never> {
-      isi = state.isi;
-      isiStreak = state.isiStreak;
+    createTrial(): Record<string, never> {
       return {};
     },
 
@@ -306,6 +344,8 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
       goHitCount = 0;
       goRtSum = 0;
       submitted = false;
+      eventDeck = buildEventDeck(EVENT_COUNT, NO_GO_COUNT);
+      eventIndex = 0;
       streamStart = performance.now();
       timerUpdateHandle = window.setInterval(updateRemainingTime, 250);
       updateRemainingTime();
@@ -327,7 +367,7 @@ export function createSustainedAttentionExercise(): Exercise<CptState, Record<st
     },
 
     readAnswer(): CptOutcome {
-      return { commissionErrors, omissionErrors, goHitCount, goRtSum, finalIsi: isi, finalIsiStreak: isiStreak };
+      return { commissionErrors, omissionErrors, goHitCount, goRtSum };
     },
 
     isCorrect(_trial: Record<string, never>, answer: unknown): boolean {

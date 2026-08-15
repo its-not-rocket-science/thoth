@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNoGoEvent, meanGoRt, summarizeStream, type CptState } from "./sustained-attention";
+import { buildEventDeck, meanGoRt, summarizeStream, type CptState } from "./sustained-attention";
 
 const EMPTY_STATE: CptState = {
   attempts: 0,
@@ -7,26 +7,45 @@ const EMPTY_STATE: CptState = {
   omissionErrors: 0,
   goHitCount: 0,
   goRtSum: 0,
-  isi: 1200,
-  isiStreak: 0,
-  bestIsi: null,
 };
 
-describe("isNoGoEvent", () => {
-  it("lands on no-go at roughly the configured rate over many draws", () => {
-    let noGoCount = 0;
-    const trials = 20_000;
-    for (let i = 0; i < trials; i++) {
-      if (isNoGoEvent(Math.random, 0.15)) noGoCount++;
+describe("buildEventDeck", () => {
+  it("contains exactly noGoCount no-go events, whatever the rng", () => {
+    for (const seed of [0, 0.25, 0.5, 0.75, 0.999]) {
+      const deck = buildEventDeck(60, 9, () => seed);
+      expect(deck.filter(Boolean)).toHaveLength(9);
+      expect(deck).toHaveLength(60);
     }
-    const rate = noGoCount / trials;
-    expect(rate).toBeGreaterThan(0.13);
-    expect(rate).toBeLessThan(0.17);
   });
 
   it("is driven deterministically by an injected rng", () => {
-    expect(isNoGoEvent(() => 0.1, 0.15)).toBe(true);
-    expect(isNoGoEvent(() => 0.2, 0.15)).toBe(false);
+    const a = buildEventDeck(20, 3, () => 0.5);
+    const b = buildEventDeck(20, 3, () => 0.5);
+    expect(a).toEqual(b);
+  });
+
+  it("varies event order across different rng streams", () => {
+    let call = 0;
+    const seq = [0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1];
+    const rngA = () => seq[call++ % seq.length] as number;
+    call = 0;
+    const rngB = () => Math.random();
+    const a = buildEventDeck(20, 5, rngA);
+    const b = buildEventDeck(20, 5, rngB);
+    // Not a strict guarantee, but with 20 items and two very different rng
+    // sources, an identical order would be a coincidence worth failing on.
+    expect(a).not.toEqual(b);
+  });
+
+  it("clamps noGoCount to the deck size rather than overflowing", () => {
+    const deck = buildEventDeck(5, 99);
+    expect(deck).toHaveLength(5);
+    expect(deck.every(Boolean)).toBe(true);
+  });
+
+  it("clamps a negative noGoCount to zero", () => {
+    const deck = buildEventDeck(5, -3);
+    expect(deck.some(Boolean)).toBe(false);
   });
 });
 
@@ -37,8 +56,6 @@ describe("summarizeStream", () => {
       omissionErrors: 2,
       goHitCount: 17,
       goRtSum: 5100,
-      finalIsi: 900,
-      finalIsiStreak: 1,
     });
     expect(next).toEqual({
       attempts: 1,
@@ -46,9 +63,6 @@ describe("summarizeStream", () => {
       omissionErrors: 2,
       goHitCount: 17,
       goRtSum: 5100,
-      isi: 900,
-      isiStreak: 1,
-      bestIsi: 900,
     });
   });
 
@@ -58,53 +72,18 @@ describe("summarizeStream", () => {
       omissionErrors: 0,
       goHitCount: 10,
       goRtSum: 3000,
-      finalIsi: 1000,
-      finalIsiStreak: 0,
     });
     const second = summarizeStream(first, {
       commissionErrors: 0,
       omissionErrors: 1,
       goHitCount: 12,
       goRtSum: 3600,
-      finalIsi: 850,
-      finalIsiStreak: 1,
     });
     expect(second.attempts).toBe(2);
     expect(second.commissionErrors).toBe(1);
     expect(second.omissionErrors).toBe(1);
     expect(second.goHitCount).toBe(22);
     expect(second.goRtSum).toBe(6600);
-    expect(second.isi).toBe(850);
-  });
-
-  it("only replaces bestIsi with a faster (lower) one", () => {
-    const first = summarizeStream(EMPTY_STATE, {
-      commissionErrors: 0,
-      omissionErrors: 0,
-      goHitCount: 10,
-      goRtSum: 3000,
-      finalIsi: 800,
-      finalIsiStreak: 0,
-    });
-    const slower = summarizeStream(first, {
-      commissionErrors: 0,
-      omissionErrors: 0,
-      goHitCount: 10,
-      goRtSum: 3000,
-      finalIsi: 950,
-      finalIsiStreak: 0,
-    });
-    expect(slower.bestIsi).toBe(800);
-
-    const faster = summarizeStream(first, {
-      commissionErrors: 0,
-      omissionErrors: 0,
-      goHitCount: 10,
-      goRtSum: 3000,
-      finalIsi: 650,
-      finalIsiStreak: 0,
-    });
-    expect(faster.bestIsi).toBe(650);
   });
 });
 
