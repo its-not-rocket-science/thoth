@@ -1,13 +1,13 @@
 # Thoth
 
-An open-source, browser-based visual processing and divided-attention training game.
+An open-source, browser-based suite of adaptive visual-attention and cognitive-performance exercises.
 
 > [!IMPORTANT]
 > Thoth is an experimental software project. It is not a medical device and has not been shown to prevent, diagnose, treat or reduce the risk of dementia, Alzheimer's disease or any other health condition.
 
 ## Status
 
-This repository contains an early playable prototype.
+This repository has grown from a single UFOV-style prototype into an eight-exercise suite with a shared `Exercise` abstraction, per-exercise persistence and longitudinal progress history, guided practice, observed-timing diagnostics, a recommended-session rotation, and Playwright e2e/visual-regression/accessibility tests.
 
 The first three exercises mirror the three official subtests of the clinical Useful Field of View (UFOV) instrument (see [Useful field of view](#useful-field-of-view) below), each independently scored and progressed:
 
@@ -15,15 +15,15 @@ The first three exercises mirror the three official subtests of the clinical Use
 2. **Centre and edge** — identify the central target while simultaneously localising a target in the peripheral visual field (divided attention).
 3. **Centre and edge, with distractors** — the same divided-attention task with the peripheral target embedded among decoy glyphs (selective attention).
 
-Four further exercises draw on separate paradigms:
+Five further exercises draw on separate paradigms:
 
 4. **Multiple object tracking** — briefly memorise a subset of identical dots as they're highlighted, then track them by eye as every dot drifts around the field, and pick the original targets back out once they stop (see [Multiple object tracking](#multiple-object-tracking) below).
 5. **Spatial cueing** — respond the instant a target appears at one of eight positions, usually (but not always) where a brief cue just brightened; measures raw reaction time and the cost of a misleading cue, not accuracy (see [Spatial cueing](#spatial-cueing) below).
 6. **Visual search** — find one target shape among a grid of distractors as fast as possible; measures how reaction time scales with the number of distractors, not raw speed (see [Visual search](#visual-search) below).
 7. **Task switching** — connect alternating numbered and lettered nodes (1-A-2-B-3-C…) in order as fast as possible; a Trail-Making-Test-style paradigm scored on completion time and error count, structured as a handful of complete-the-trail rounds rather than short flash trials (see [Task switching](#task-switching) below).
-8. **Sustained attention** — respond to a rapid ~65-second stream of central glyphs, pressing for the frequent "go" shape and withholding for the rare "no-go" shape; a continuous performance test (CPT) paradigm scored on commission errors, omission errors, and mean reaction time, not accuracy at a single presentation (see [Sustained attention](#sustained-attention) below).
+8. **Sustained attention** — respond to a fixed-length stream of central glyphs, pressing for the frequent "go" shape and withholding for the rare "no-go" shape; a continuous performance test (CPT) paradigm scored on commission errors, omission errors, and mean reaction time, not accuracy at a single presentation (see [Sustained attention](#sustained-attention) below).
 
-Exercises 1–4 and 6 continue at an adaptively adjusted level of difficulty; spatial cueing and task switching measure time/errors directly instead and don't use a difficulty staircase (see their sections below for why). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, spatial attention, visual search, and task switching. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
+Exercises 1–4 continue at an adaptively adjusted level of difficulty; spatial cueing, task switching and sustained attention measure time/errors directly instead against a fixed protocol, and visual search does some of both (see [Exercise classification](#exercise-classification) below for the full breakdown and rationale). The project is inspired by published research into visual speed-of-processing training, the useful field of view, multiple object tracking, spatial attention, visual search, task switching and sustained attention. It will not copy BrainHQ's artwork, source code, progression system, scoring system or proprietary implementation.
 
 ## About the name
 
@@ -37,12 +37,18 @@ The name does not imply medical, diagnostic or therapeutic ability.
 
 ## Goals
 
-Thoth aims to explore how an independently designed browser game can train:
+Thoth aims to explore how an independently designed browser suite can train and/or measure:
 
 - visual processing speed;
 - divided attention;
 - peripheral target localisation;
-- resistance to visual distraction; and
+- selective attention / distractor resistance;
+- multiple-object tracking;
+- spatial attentional orienting;
+- visual search efficiency;
+- task switching;
+- sustained attention;
+- response inhibition; and
 - speed–accuracy control.
 
 The initial priorities are accurate and testable presentation, a transparent adaptive algorithm, suitability for older users, local-first storage, reproducible session data, low software overhead and cautious public claims.
@@ -52,6 +58,43 @@ The initial priorities are accurate and testable presentation, a transparent ada
 Thoth is not currently intended to diagnose cognitive impairment, estimate dementia risk, claim equivalence to a studied commercial intervention, provide medical advice, reproduce BrainHQ's Double Decision exercise, collect identifiable health information or replace professional assessment or treatment.
 
 Improvement within the game must not automatically be interpreted as improvement in general cognition or everyday functioning.
+
+## Exercise classification
+
+Every exercise declares a `mode` on the shared `Exercise` abstraction (`src/exercise.ts`): `"training"`, `"measurement"`, or `"mixed"`. This isn't cosmetic — it says how to read that exercise's numbers, and it's shown as a small badge on its picker card:
+
+| # | Exercise | Mode | Why |
+| --- | --- | --- | --- |
+| 1 | Centre only | Training | Adaptive presentation-interval staircase runs on every scored trial; no fixed protocol underlies the numbers, so they're a training curve, not a standardised score. |
+| 2 | Centre and edge | Training | Same staircase, same reasoning. |
+| 3 | Centre and edge, with distractors | Training | Same staircase (plus a second, distractor-count staircase), same reasoning. |
+| 4 | Multiple object tracking | Training | Object count adapts continuously via the same 2-down-1-up rule; no fixed protocol. |
+| 5 | Spatial cueing | Measurement | Fixed 80/20 valid/invalid ratio, no staircase — the manipulation of interest (the RT cost of an invalid cue) is measured, not trained. |
+| 6 | Visual search | Mixed | Set size adapts via a staircase (a training element), but the scientifically meaningful output — the RT-by-set-size slope — is a measurement construct, not a score to maximise. |
+| 7 | Task switching | Measurement | Fixed 12-node trail every round, no staircase — mirrors the standardised Trail Making Test B protocol it's derived from. |
+| 8 | Sustained attention | Measurement | Standardised protocol (see [Sustained attention](#sustained-attention) below) — no staircase, fixed event count, fixed ISI, fixed go/no-go ratio. |
+
+"Training" exercises are the ones to keep replaying to build a curve; "measurement" exercises are the ones whose session-to-session numbers are most directly comparable, the way a repeated experimental measure's would be; "mixed" sits in between. None of this is a claim of clinical validity — see [Scientific caution](#scientific-caution).
+
+### Progress tracking
+
+Every exercise defines its own `metrics` (label, unit, and whether lower or higher counts as improvement) and a `primaryMetricKey` for its longitudinal chart — there is deliberately no single unified "brain score" across exercises with very different underlying constructs. A **Progress** button on the exercise screen opens a small inline SVG line chart plus a table of the metric's last few sessions with a ▲/▼ direction indicator, always labelled with which direction is "better" for that specific metric. Given how few sessions most players will have, the panel always shows a caution:
+
+> Session-to-session changes may reflect familiarity, fatigue, device conditions or normal variability — especially over just a few sessions.
+
+Session history is stored per exercise (`src/history.ts`) as `{ exerciseId, timestamp, metrics, schemaVersion }`, capped at the 20 most recent sessions. A pre-generalised-schema save (score/accuracy/lowest-interval only, from before this consolidation pass) is transparently migrated into the current shape the first time it's read, so existing UFOV history survives the change.
+
+### Guided practice
+
+Every exercise offers a **Practise** button. Practice runs the exercise's real mechanics — the same `createTrial`/`showTrial`/scoring code as a scored session — but seeded from an eased starting state (an exercise-supplied `practiceState()` hook: e.g. the slowest presentation interval for the UFOV exercises, the fewest objects for multiple-object tracking, the smallest set size for visual search) and never calls into saved progress, session history, or the adaptive staircase's persisted state. A first-time player (never practised, never played) sees an inline prompt suggesting practice; anyone else can skip straight to a scored session, or return to practice at any time.
+
+### Timing diagnostics
+
+For every timed presentation, the host (not each exercise individually) records both the *requested* duration an exercise asked for and the *observed* one — `performance.now()` immediately around the `showTrial()`/`hideTrial()` calls it already makes for every exercise uniformly. A presentation interrupted by a paused/hidden tab, a manual pause, or a reset is flagged `valid: false` with a reason, rather than silently counted as if the requested timing held. This is browser-timer precision, not laboratory-grade frame timing — coordinating onset/offset with `requestAnimationFrame` was considered and deliberately not done (see [Follow-up work not implemented](#follow-up-work-not-implemented)). Diagnostics are kept locally (capped at 200 records) and can be exported as a plain JSON file from the button in the footer; they're not shown in the normal play UI.
+
+### Recommended session
+
+A **Recommended session** button on the picker builds a short queue — one UFOV exercise, one attentional-orienting/search exercise, one executive/sustained-attention exercise, roughly 10–15 minutes total — rotating away from whichever exercises were picked last time a different option exists (`src/recommended.ts`). It's explicitly a software-designed rotation for variety, not a clinically validated prescription; every slot can be started, replaced with another candidate in its category, or skipped, and each exercise keeps its own independent progression and history regardless of how it was reached.
 
 ## Vision dependency
 
@@ -128,7 +171,9 @@ The BrainHQ page is included to document the commercial exercise associated with
 
 ### Sustained attention
 
-"Sustained attention" (Exercise No. 08) is grounded in the continuous performance test (CPT) literature, and is the app's only exercise built around vigilance over an extended period rather than a single brief presentation. A rapid stream of circles ("go") and rare diamonds ("no-go", ~15% of events) passes the centre of the field for about a minute; the player responds to every circle and withholds on every diamond. Scored on commission errors (responding to a no-go), omission errors (missing a go), and mean reaction time on correct go trials — inter-stimulus interval adapts via the same 2-down-1-up staircase used elsewhere, shortening as the player keeps pace and lengthening after a lapse:
+"Sustained attention" (Exercise No. 08) is grounded in the continuous performance test (CPT) literature, and is the app's only exercise built around vigilance over an extended period rather than a single brief presentation. A stream of circles ("go") and diamonds ("no-go") passes the centre of the field; the player responds to every circle and withholds on every diamond. Scored on commission errors (responding to a no-go), omission errors (missing a go), and mean reaction time on correct go trials.
+
+Unlike every other exercise in this list, sustained attention runs a **standardised measurement protocol rather than an adaptive one**: a fixed 54 events per stream, a fixed inter-stimulus interval (1200ms, never adapted during the stream), and an exact fixed no-go count (8 of the 54, dealt into a shuffled deck rather than drawn per event at random) — so the go/no-go ratio is exact, not merely probable over a long stream. This was a deliberate consolidation-phase decision: an earlier version adapted inter-stimulus interval via the same 2-down-1-up staircase used elsewhere, which complicates interpreting commission errors, omission errors and mean RT, and makes sessions hard to compare to each other. Rather than build and maintain a *second*, separately-adaptive CPT protocol alongside this standardised one — extra surface area on the app's most fatiguing exercise, for a training benefit no other exercise here depends on this heavily to deliver — this exercise took the simpler of the two options the brief allowed: standardise fully, and document the choice here. See [Exercise classification](#exercise-classification) for why this makes it a "measurement", not "training", exercise.
 
 - Rosvold HE, Mirsky AF, Sarason I, Bransome ED Jr, Beck LH. **A continuous performance test of brain damage.** *Journal of Consulting Psychology*. 1956;20(5):343–350.
 
@@ -243,8 +288,8 @@ If the repository name changes, update `base` in `vite.config.ts`.
 - [x] Two-part response collection
 - [x] Simple adaptive presentation duration
 - [x] Local best result
-- [ ] Observed-duration recording
-- [ ] Guided practice trials
+- [x] Observed-duration recording
+- [x] Guided practice trials
 - [ ] Seeded sessions
 - [x] Broader unit and browser tests
 
@@ -285,6 +330,20 @@ that dimension's default rather than being discarded.
 - [ ] Assess test–retest reliability
 - [ ] Compare adaptive rules
 - [ ] Develop a preregistered validation proposal
+
+## Unresolved scientific-design decisions
+
+- **Visual search's "mixed" classification.** Its set-size staircase adapts (a training property) while the slope it produces is the actually-meaningful measurement; the brief allowed either "measurement" or "mixed" and this project picked "mixed" without a strong argument either way.
+- **Spatial cueing's validity-effect direction.** `validityEffect` (invalid RT − valid RT) is deliberately labelled `"neutral"`, not `"lower is better"` — a smaller cueing cost could mean a more efficient orienting response, but could equally mean a weak or noisy cueing effect over only 20 trials. Which reading is correct isn't resolved here.
+- **Sustained attention's fixed parameters** (54 events, 1200ms ISI, 15% no-go) were chosen to land close to the previous adaptive version's typical stream length, not derived from a specific published CPT protocol.
+- **CPT's requested-duration timing diagnostic is inflated.** Its `flashDurationMs()` returns a generous safety-margin ceiling (the stream almost always ends itself first, well before the host's own fallback timer would), so its timing-diagnostic records will show `observedMs` consistently well under `requestedMs` — accurate, but not the useful "did this run at protocol length" comparison the other exercises' records give.
+
+## Follow-up work not implemented
+
+- **`requestAnimationFrame`-aligned onset/offset.** The brief asked for this "where practical"; it was judged impractical here because jsdom (this project's unit-test environment) doesn't reliably support `requestAnimationFrame`, and wiring it into the one host code path every exercise shares risked breaking the whole suite for a precision gain `performance.now()` timestamps around the existing `showTrial()`/`hideTrial()` calls already mostly capture.
+- **Bespoke per-exercise practice tutorials.** The brief's practice examples (e.g. "highlight possible peripheral positions" for centre-and-edge, "show one feature-search and one conjunction-search example" for visual search) describe custom guided walkthroughs. What's implemented instead is one generic mechanism — real trials, eased via `practiceState()`, never scored or saved — reused by every exercise. It demonstrates the real mechanic at an easier difficulty rather than adding a bespoke tutorial overlay per exercise.
+- **Seeded sessions**, carried over unimplemented from the previous roadmap.
+- **New Playwright e2e coverage for the new UI** (practice mode, the progress panel, the recommended-session panel). The existing e2e/a11y/visual-regression suites were re-run against every change in this pass (see the project's own Docker-based `npm run test:visual` instructions above) and still pass, and the visual-regression baselines were regenerated for the new UI elements, but no *new* spec files were added to exercise practice/progress/recommended-session interaction end-to-end — only unit-level coverage (`src/*.test.ts`) exists for those.
 
 ## Contributing
 
